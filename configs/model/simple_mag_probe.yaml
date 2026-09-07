@@ -1,0 +1,22 @@
+name: simple_mag_probe
+
+# R0 SimpleMAGProbe: additive single-layer MAG diagnostic probe (NOT a SOTA
+# method). Architecture per docs/FIRM_MAG_R0_实验阶段性推进计划.md §3:
+#   f_T/f_V 2-layer MLP projectors -> h_self = W_self[hT||hV]
+#   delta_T_ij = alpha_ij W_T hT_j ; delta_V_ij = alpha_ij W_V hV_j
+#   z_i = h_self_i + sum_{j->i}(delta_T + delta_V)
+# No attention/router/MoE/OT; exactly one message-passing layer.
+
+hidden_dim: 128
+num_proj_layers: 2
+dropout: 0.2
+activation: relu
+norm: none
+
+# MAGB text features are un-normalized (L2 ~12.25) while CLIP image features
+# are pre-normalized (L2 ~1); per-modality L2 before projection avoids the
+# text channel trivially dominating the visual channel.
+normalize_modalities: true
+
+lr: 1e-3
+weight_decay: 1e-4
