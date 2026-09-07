@@ -1,0 +1,9 @@
+- dataset=Grocery
+- task=nc
+- model=simple_mag_probe
+- seed=42
+- num_runs=1
+- task.evaluate_test=true
+- task.save_ckpt_path=/hdd1/DataInHere/YHF/exp/experiments/r0/checkpoints/Grocery_seed42_probe.pt
+- task.history_path=/hdd1/DataInHere/YHF/exp/experiments/r0/results/Grocery/seed_42/probe_train_log.csv
+- device=cuda:0

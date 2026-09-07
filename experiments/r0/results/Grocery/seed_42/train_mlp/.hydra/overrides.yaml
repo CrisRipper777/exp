@@ -1,0 +1,6 @@
+- dataset=Grocery
+- task=nc
+- model=mlp
+- seed=42
+- num_runs=1
+- device=cuda:1

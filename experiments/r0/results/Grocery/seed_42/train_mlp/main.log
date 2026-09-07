@@ -1,0 +1,823 @@
+[2026-09-07 23:08:24] INFO - Resolved config:
+dataset:
+  name: Grocery
+  source: magb
+  tasks:
+  - nc
+  - lp
+  graph_path: /hdd1/DataInHere/YHF/data/Grocery/GroceryGraph.pt
+  text_feat_path: /hdd1/DataInHere/YHF/data/Grocery/TextFeature/Grocery_roberta_base_256_mean.npy
+  image_feat_path: /hdd1/DataInHere/YHF/data/Grocery/ImageFeature/Grocery_openai_clip-vit-large-patch14.npy
+  num_classes: 20
+  feature_dtype: float32
+  make_undirected: true
+  add_self_loops: false
+  nc_split_path: /hdd1/DataInHere/YHF/data/MAGB_split/Grocery_nc_seed42_train0.6_val0.2.pt
+  lp_split_path: /hdd1/DataInHere/YHF/data/MAGB_split/Grocery_lp_seed42_val0.2_test0.2_neg150_filtered1.pt
+  nc_train_ratio: 0.6
+  nc_val_ratio: 0.2
+  lp_val_ratio: 0.2
+  lp_test_ratio: 0.2
+  lp_num_neg: 150
+  lp_split_undirected: true
+  auto_generate_splits: true
+task:
+  name: nc
+  training_mode: full_graph
+  optimizer: adamw
+  epochs: 300
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 30
+  early_stop_min_epoch: 1
+  grad_clip: null
+  batch_size: 1024
+  num_neighbors: 15
+  inference_mode: full
+  inference_batch_size: 4096
+  eval_every: 1
+  max_train_batches: null
+  save_ckpt_path: null
+  loss:
+    aux_weight: 1.0
+  evaluate_test: true
+  history_path: null
+  scheduler: null
+  scheduler_warmup_epochs: 10
+  scheduler_min_lr: 1.0e-05
+model:
+  name: mlp
+  hidden_dim: 128
+  num_layers: 2
+  dropout: 0.5
+  activation: relu
+  norm: none
+  lr: 0.001
+  weight_decay: 0.0001
+seed: 42
+num_runs: 1
+device: cuda:1
+paths:
+  data_root: /hdd1/DataInHere/YHF/data
+  split_root: /hdd1/DataInHere/YHF/data/MAGB_split
+  output_root: outputs
+logging:
+  level: INFO
+
+[2026-09-07 23:08:24] INFO - Device: cuda:1
+[2026-09-07 23:08:27] INFO - Dataset: Grocery | Source: magb | Task: nc
+[2026-09-07 23:08:27] INFO - Model: mlp
+[2026-09-07 23:08:27] INFO - X: (17074, 1536) | dtype=torch.float32
+[2026-09-07 23:08:27] INFO - X_i: (17074, 768) | X_t: (17074, 768)
+[2026-09-07 23:08:27] INFO - Graph edge_index: (2, 142262) | num_nodes=17074 | num_edges=142262
+[2026-09-07 23:08:27] INFO - Labels: shape=(17074,) | num_classes=20
+[2026-09-07 23:08:27] INFO - NC split: train=10244 | val=3415 | test=3415
+[2026-09-07 23:08:27] INFO - nc_split_path: /hdd1/DataInHere/YHF/data/MAGB_split/Grocery_nc_seed42_train0.6_val0.2.pt
+[2026-09-07 23:08:27] INFO - [Run 1/1] seed=42 | model+head params=215828
+[2026-09-07 23:08:27] INFO - Loader: FullGraph | optimizer: adamw
+[2026-09-07 23:08:27] INFO - Inference mode: full
+[2026-09-07 23:08:27] INFO - Training...
+[2026-09-07 23:08:29] INFO - Epoch 00001 | Train Loss 2.9949
+[2026-09-07 23:08:29] INFO - Val Acc 5.12 | Val F1 0.49
+[2026-09-07 23:08:30] INFO - Epoch 00002 | Train Loss 2.9654
+[2026-09-07 23:08:30] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:30] INFO - Epoch 00003 | Train Loss 2.9363
+[2026-09-07 23:08:30] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:30] INFO - Patience 1/30 | Best Val Acc 14.14
+[2026-09-07 23:08:30] INFO - Epoch 00004 | Train Loss 2.9049
+[2026-09-07 23:08:30] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:30] INFO - Patience 2/30 | Best Val Acc 14.14
+[2026-09-07 23:08:30] INFO - Epoch 00005 | Train Loss 2.8718
+[2026-09-07 23:08:30] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:30] INFO - Patience 3/30 | Best Val Acc 14.14
+[2026-09-07 23:08:30] INFO - Epoch 00006 | Train Loss 2.8387
+[2026-09-07 23:08:30] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:30] INFO - Patience 4/30 | Best Val Acc 14.14
+[2026-09-07 23:08:31] INFO - Epoch 00007 | Train Loss 2.8028
+[2026-09-07 23:08:31] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:31] INFO - Patience 5/30 | Best Val Acc 14.14
+[2026-09-07 23:08:31] INFO - Epoch 00008 | Train Loss 2.7731
+[2026-09-07 23:08:31] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:31] INFO - Patience 6/30 | Best Val Acc 14.14
+[2026-09-07 23:08:31] INFO - Epoch 00009 | Train Loss 2.7512
+[2026-09-07 23:08:31] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:31] INFO - Patience 7/30 | Best Val Acc 14.14
+[2026-09-07 23:08:31] INFO - Epoch 00010 | Train Loss 2.7382
+[2026-09-07 23:08:31] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:31] INFO - Patience 8/30 | Best Val Acc 14.14
+[2026-09-07 23:08:31] INFO - Epoch 00011 | Train Loss 2.7327
+[2026-09-07 23:08:31] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:31] INFO - Patience 9/30 | Best Val Acc 14.14
+[2026-09-07 23:08:32] INFO - Epoch 00012 | Train Loss 2.7307
+[2026-09-07 23:08:32] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:32] INFO - Patience 10/30 | Best Val Acc 14.14
+[2026-09-07 23:08:32] INFO - Epoch 00013 | Train Loss 2.7226
+[2026-09-07 23:08:32] INFO - Val Acc 14.14 | Val F1 1.24
+[2026-09-07 23:08:32] INFO - Patience 11/30 | Best Val Acc 14.14
+[2026-09-07 23:08:32] INFO - Epoch 00014 | Train Loss 2.7162
+[2026-09-07 23:08:32] INFO - Val Acc 14.17 | Val F1 1.27
+[2026-09-07 23:08:32] INFO - Epoch 00015 | Train Loss 2.7068
+[2026-09-07 23:08:32] INFO - Val Acc 14.29 | Val F1 1.41
+[2026-09-07 23:08:32] INFO - Epoch 00016 | Train Loss 2.6911
+[2026-09-07 23:08:32] INFO - Val Acc 14.38 | Val F1 1.51
+[2026-09-07 23:08:33] INFO - Epoch 00017 | Train Loss 2.6789
+[2026-09-07 23:08:33] INFO - Val Acc 14.38 | Val F1 1.50
+[2026-09-07 23:08:33] INFO - Patience 1/30 | Best Val Acc 14.38
+[2026-09-07 23:08:33] INFO - Epoch 00018 | Train Loss 2.6602
+[2026-09-07 23:08:33] INFO - Val Acc 14.44 | Val F1 1.56
+[2026-09-07 23:08:33] INFO - Epoch 00019 | Train Loss 2.6487
+[2026-09-07 23:08:33] INFO - Val Acc 14.52 | Val F1 1.66
+[2026-09-07 23:08:33] INFO - Epoch 00020 | Train Loss 2.6360
+[2026-09-07 23:08:33] INFO - Val Acc 14.99 | Val F1 2.15
+[2026-09-07 23:08:33] INFO - Epoch 00021 | Train Loss 2.6204
+[2026-09-07 23:08:33] INFO - Val Acc 15.64 | Val F1 2.79
+[2026-09-07 23:08:34] INFO - Epoch 00022 | Train Loss 2.6038
+[2026-09-07 23:08:34] INFO - Val Acc 17.34 | Val F1 4.31
+[2026-09-07 23:08:34] INFO - Epoch 00023 | Train Loss 2.5910
+[2026-09-07 23:08:34] INFO - Val Acc 20.03 | Val F1 6.23
+[2026-09-07 23:08:34] INFO - Epoch 00024 | Train Loss 2.5723
+[2026-09-07 23:08:34] INFO - Val Acc 23.16 | Val F1 8.23
+[2026-09-07 23:08:35] INFO - Epoch 00025 | Train Loss 2.5565
+[2026-09-07 23:08:35] INFO - Val Acc 26.33 | Val F1 9.90
+[2026-09-07 23:08:35] INFO - Epoch 00026 | Train Loss 2.5362
+[2026-09-07 23:08:35] INFO - Val Acc 28.40 | Val F1 10.69
+[2026-09-07 23:08:35] INFO - Epoch 00027 | Train Loss 2.5176
+[2026-09-07 23:08:35] INFO - Val Acc 30.34 | Val F1 11.48
+[2026-09-07 23:08:35] INFO - Epoch 00028 | Train Loss 2.4924
+[2026-09-07 23:08:35] INFO - Val Acc 31.54 | Val F1 11.94
+[2026-09-07 23:08:35] INFO - Epoch 00029 | Train Loss 2.4635
+[2026-09-07 23:08:35] INFO - Val Acc 32.42 | Val F1 12.15
+[2026-09-07 23:08:36] INFO - Epoch 00030 | Train Loss 2.4411
+[2026-09-07 23:08:36] INFO - Val Acc 33.47 | Val F1 12.67
+[2026-09-07 23:08:36] INFO - Epoch 00031 | Train Loss 2.4138
+[2026-09-07 23:08:36] INFO - Val Acc 34.20 | Val F1 12.97
+[2026-09-07 23:08:36] INFO - Epoch 00032 | Train Loss 2.3833
+[2026-09-07 23:08:36] INFO - Val Acc 35.31 | Val F1 13.65
+[2026-09-07 23:08:36] INFO - Epoch 00033 | Train Loss 2.3626
+[2026-09-07 23:08:36] INFO - Val Acc 36.34 | Val F1 14.53
+[2026-09-07 23:08:37] INFO - Epoch 00034 | Train Loss 2.3345
+[2026-09-07 23:08:37] INFO - Val Acc 37.60 | Val F1 15.39
+[2026-09-07 23:08:37] INFO - Epoch 00035 | Train Loss 2.3062
+[2026-09-07 23:08:37] INFO - Val Acc 39.00 | Val F1 16.64
+[2026-09-07 23:08:37] INFO - Epoch 00036 | Train Loss 2.2770
+[2026-09-07 23:08:37] INFO - Val Acc 40.23 | Val F1 17.84
+[2026-09-07 23:08:37] INFO - Epoch 00037 | Train Loss 2.2429
+[2026-09-07 23:08:37] INFO - Val Acc 41.29 | Val F1 18.69
+[2026-09-07 23:08:37] INFO - Epoch 00038 | Train Loss 2.2131
+[2026-09-07 23:08:37] INFO - Val Acc 42.25 | Val F1 19.66
+[2026-09-07 23:08:38] INFO - Epoch 00039 | Train Loss 2.1831
+[2026-09-07 23:08:38] INFO - Val Acc 43.34 | Val F1 20.57
+[2026-09-07 23:08:38] INFO - Epoch 00040 | Train Loss 2.1509
+[2026-09-07 23:08:38] INFO - Val Acc 44.19 | Val F1 21.29
+[2026-09-07 23:08:38] INFO - Epoch 00041 | Train Loss 2.1168
+[2026-09-07 23:08:38] INFO - Val Acc 45.24 | Val F1 22.34
+[2026-09-07 23:08:38] INFO - Epoch 00042 | Train Loss 2.0896
+[2026-09-07 23:08:38] INFO - Val Acc 46.21 | Val F1 23.30
+[2026-09-07 23:08:38] INFO - Epoch 00043 | Train Loss 2.0641
+[2026-09-07 23:08:38] INFO - Val Acc 46.97 | Val F1 24.02
+[2026-09-07 23:08:39] INFO - Epoch 00044 | Train Loss 2.0296
+[2026-09-07 23:08:39] INFO - Val Acc 48.02 | Val F1 24.98
+[2026-09-07 23:08:39] INFO - Epoch 00045 | Train Loss 2.0067
+[2026-09-07 23:08:39] INFO - Val Acc 48.81 | Val F1 25.67
+[2026-09-07 23:08:39] INFO - Epoch 00046 | Train Loss 1.9797
+[2026-09-07 23:08:39] INFO - Val Acc 49.49 | Val F1 26.48
+[2026-09-07 23:08:39] INFO - Epoch 00047 | Train Loss 1.9522
+[2026-09-07 23:08:39] INFO - Val Acc 50.31 | Val F1 27.15
+[2026-09-07 23:08:39] INFO - Epoch 00048 | Train Loss 1.9246
+[2026-09-07 23:08:39] INFO - Val Acc 50.72 | Val F1 27.43
+[2026-09-07 23:08:40] INFO - Epoch 00049 | Train Loss 1.8976
+[2026-09-07 23:08:40] INFO - Val Acc 51.33 | Val F1 28.14
+[2026-09-07 23:08:40] INFO - Epoch 00050 | Train Loss 1.8753
+[2026-09-07 23:08:40] INFO - Val Acc 52.21 | Val F1 29.42
+[2026-09-07 23:08:40] INFO - Epoch 00051 | Train Loss 1.8425
+[2026-09-07 23:08:40] INFO - Val Acc 53.18 | Val F1 30.33
+[2026-09-07 23:08:41] INFO - Epoch 00052 | Train Loss 1.8228
+[2026-09-07 23:08:41] INFO - Val Acc 53.82 | Val F1 31.27
+[2026-09-07 23:08:41] INFO - Epoch 00053 | Train Loss 1.8020
+[2026-09-07 23:08:41] INFO - Val Acc 54.64 | Val F1 32.48
+[2026-09-07 23:08:41] INFO - Epoch 00054 | Train Loss 1.7807
+[2026-09-07 23:08:41] INFO - Val Acc 55.37 | Val F1 33.30
+[2026-09-07 23:08:41] INFO - Epoch 00055 | Train Loss 1.7572
+[2026-09-07 23:08:41] INFO - Val Acc 56.22 | Val F1 34.31
+[2026-09-07 23:08:41] INFO - Epoch 00056 | Train Loss 1.7402
+[2026-09-07 23:08:41] INFO - Val Acc 56.78 | Val F1 35.04
+[2026-09-07 23:08:41] INFO - Epoch 00057 | Train Loss 1.7201
+[2026-09-07 23:08:41] INFO - Val Acc 57.45 | Val F1 35.75
+[2026-09-07 23:08:42] INFO - Epoch 00058 | Train Loss 1.6877
+[2026-09-07 23:08:42] INFO - Val Acc 58.04 | Val F1 36.44
+[2026-09-07 23:08:42] INFO - Epoch 00059 | Train Loss 1.6732
+[2026-09-07 23:08:42] INFO - Val Acc 58.89 | Val F1 37.30
+[2026-09-07 23:08:42] INFO - Epoch 00060 | Train Loss 1.6554
+[2026-09-07 23:08:42] INFO - Val Acc 59.53 | Val F1 37.98
+[2026-09-07 23:08:42] INFO - Epoch 00061 | Train Loss 1.6423
+[2026-09-07 23:08:42] INFO - Val Acc 59.97 | Val F1 38.33
+[2026-09-07 23:08:43] INFO - Epoch 00062 | Train Loss 1.6262
+[2026-09-07 23:08:43] INFO - Val Acc 60.06 | Val F1 38.45
+[2026-09-07 23:08:43] INFO - Epoch 00063 | Train Loss 1.6122
+[2026-09-07 23:08:43] INFO - Val Acc 60.47 | Val F1 38.84
+[2026-09-07 23:08:43] INFO - Epoch 00064 | Train Loss 1.5852
+[2026-09-07 23:08:43] INFO - Val Acc 60.91 | Val F1 39.23
+[2026-09-07 23:08:43] INFO - Epoch 00065 | Train Loss 1.5734
+[2026-09-07 23:08:43] INFO - Val Acc 61.32 | Val F1 39.69
+[2026-09-07 23:08:43] INFO - Epoch 00066 | Train Loss 1.5581
+[2026-09-07 23:08:43] INFO - Val Acc 61.43 | Val F1 39.84
+[2026-09-07 23:08:44] INFO - Epoch 00067 | Train Loss 1.5474
+[2026-09-07 23:08:44] INFO - Val Acc 61.84 | Val F1 40.18
+[2026-09-07 23:08:44] INFO - Epoch 00068 | Train Loss 1.5305
+[2026-09-07 23:08:44] INFO - Val Acc 61.93 | Val F1 40.31
+[2026-09-07 23:08:44] INFO - Epoch 00069 | Train Loss 1.5188
+[2026-09-07 23:08:44] INFO - Val Acc 62.14 | Val F1 40.49
+[2026-09-07 23:08:44] INFO - Epoch 00070 | Train Loss 1.5009
+[2026-09-07 23:08:44] INFO - Val Acc 62.40 | Val F1 40.79
+[2026-09-07 23:08:44] INFO - Epoch 00071 | Train Loss 1.4847
+[2026-09-07 23:08:44] INFO - Val Acc 62.55 | Val F1 40.94
+[2026-09-07 23:08:45] INFO - Epoch 00072 | Train Loss 1.4846
+[2026-09-07 23:08:45] INFO - Val Acc 62.75 | Val F1 41.09
+[2026-09-07 23:08:45] INFO - Epoch 00073 | Train Loss 1.4664
+[2026-09-07 23:08:45] INFO - Val Acc 62.81 | Val F1 41.12
+[2026-09-07 23:08:45] INFO - Epoch 00074 | Train Loss 1.4523
+[2026-09-07 23:08:45] INFO - Val Acc 62.90 | Val F1 41.10
+[2026-09-07 23:08:45] INFO - Epoch 00075 | Train Loss 1.4363
+[2026-09-07 23:08:45] INFO - Val Acc 62.84 | Val F1 41.07
+[2026-09-07 23:08:45] INFO - Patience 1/30 | Best Val Acc 62.90
+[2026-09-07 23:08:45] INFO - Epoch 00076 | Train Loss 1.4264
+[2026-09-07 23:08:45] INFO - Val Acc 63.07 | Val F1 41.31
+[2026-09-07 23:08:45] INFO - Epoch 00077 | Train Loss 1.4088
+[2026-09-07 23:08:45] INFO - Val Acc 63.48 | Val F1 41.63
+[2026-09-07 23:08:46] INFO - Epoch 00078 | Train Loss 1.4044
+[2026-09-07 23:08:46] INFO - Val Acc 63.57 | Val F1 41.70
+[2026-09-07 23:08:46] INFO - Epoch 00079 | Train Loss 1.3995
+[2026-09-07 23:08:46] INFO - Val Acc 63.75 | Val F1 41.83
+[2026-09-07 23:08:46] INFO - Epoch 00080 | Train Loss 1.3721
+[2026-09-07 23:08:46] INFO - Val Acc 63.98 | Val F1 41.99
+[2026-09-07 23:08:46] INFO - Epoch 00081 | Train Loss 1.3717
+[2026-09-07 23:08:46] INFO - Val Acc 64.19 | Val F1 42.19
+[2026-09-07 23:08:47] INFO - Epoch 00082 | Train Loss 1.3638
+[2026-09-07 23:08:47] INFO - Val Acc 64.51 | Val F1 42.49
+[2026-09-07 23:08:47] INFO - Epoch 00083 | Train Loss 1.3452
+[2026-09-07 23:08:47] INFO - Val Acc 64.77 | Val F1 42.82
+[2026-09-07 23:08:47] INFO - Epoch 00084 | Train Loss 1.3385
+[2026-09-07 23:08:47] INFO - Val Acc 64.80 | Val F1 42.79
+[2026-09-07 23:08:47] INFO - Epoch 00085 | Train Loss 1.3253
+[2026-09-07 23:08:47] INFO - Val Acc 65.04 | Val F1 42.99
+[2026-09-07 23:08:47] INFO - Epoch 00086 | Train Loss 1.3136
+[2026-09-07 23:08:47] INFO - Val Acc 65.30 | Val F1 43.20
+[2026-09-07 23:08:47] INFO - Epoch 00087 | Train Loss 1.3079
+[2026-09-07 23:08:47] INFO - Val Acc 65.21 | Val F1 43.26
+[2026-09-07 23:08:47] INFO - Patience 1/30 | Best Val Acc 65.30
+[2026-09-07 23:08:48] INFO - Epoch 00088 | Train Loss 1.3089
+[2026-09-07 23:08:48] INFO - Val Acc 65.42 | Val F1 43.46
+[2026-09-07 23:08:48] INFO - Epoch 00089 | Train Loss 1.2858
+[2026-09-07 23:08:48] INFO - Val Acc 65.56 | Val F1 43.49
+[2026-09-07 23:08:48] INFO - Epoch 00090 | Train Loss 1.2873
+[2026-09-07 23:08:48] INFO - Val Acc 65.68 | Val F1 43.64
+[2026-09-07 23:08:48] INFO - Epoch 00091 | Train Loss 1.2844
+[2026-09-07 23:08:48] INFO - Val Acc 65.97 | Val F1 44.01
+[2026-09-07 23:08:48] INFO - Epoch 00092 | Train Loss 1.2662
+[2026-09-07 23:08:48] INFO - Val Acc 66.06 | Val F1 44.12
+[2026-09-07 23:08:49] INFO - Epoch 00093 | Train Loss 1.2659
+[2026-09-07 23:08:49] INFO - Val Acc 66.18 | Val F1 44.28
+[2026-09-07 23:08:49] INFO - Epoch 00094 | Train Loss 1.2539
+[2026-09-07 23:08:49] INFO - Val Acc 66.15 | Val F1 44.35
+[2026-09-07 23:08:49] INFO - Patience 1/30 | Best Val Acc 66.18
+[2026-09-07 23:08:49] INFO - Epoch 00095 | Train Loss 1.2436
+[2026-09-07 23:08:49] INFO - Val Acc 66.27 | Val F1 44.44
+[2026-09-07 23:08:50] INFO - Epoch 00096 | Train Loss 1.2459
+[2026-09-07 23:08:50] INFO - Val Acc 66.35 | Val F1 44.63
+[2026-09-07 23:08:50] INFO - Epoch 00097 | Train Loss 1.2263
+[2026-09-07 23:08:50] INFO - Val Acc 66.62 | Val F1 44.88
+[2026-09-07 23:08:50] INFO - Epoch 00098 | Train Loss 1.2246
+[2026-09-07 23:08:50] INFO - Val Acc 66.59 | Val F1 44.91
+[2026-09-07 23:08:50] INFO - Patience 1/30 | Best Val Acc 66.62
+[2026-09-07 23:08:50] INFO - Epoch 00099 | Train Loss 1.2079
+[2026-09-07 23:08:50] INFO - Val Acc 66.62 | Val F1 45.19
+[2026-09-07 23:08:50] INFO - Patience 2/30 | Best Val Acc 66.62
+[2026-09-07 23:08:50] INFO - Epoch 00100 | Train Loss 1.2122
+[2026-09-07 23:08:50] INFO - Val Acc 66.62 | Val F1 45.15
+[2026-09-07 23:08:50] INFO - Patience 3/30 | Best Val Acc 66.62
+[2026-09-07 23:08:51] INFO - Epoch 00101 | Train Loss 1.2085
+[2026-09-07 23:08:51] INFO - Val Acc 66.68 | Val F1 45.24
+[2026-09-07 23:08:51] INFO - Epoch 00102 | Train Loss 1.1996
+[2026-09-07 23:08:51] INFO - Val Acc 66.85 | Val F1 45.32
+[2026-09-07 23:08:51] INFO - Epoch 00103 | Train Loss 1.2013
+[2026-09-07 23:08:51] INFO - Val Acc 67.00 | Val F1 45.43
+[2026-09-07 23:08:51] INFO - Epoch 00104 | Train Loss 1.1934
+[2026-09-07 23:08:51] INFO - Val Acc 67.17 | Val F1 45.70
+[2026-09-07 23:08:51] INFO - Epoch 00105 | Train Loss 1.1838
+[2026-09-07 23:08:51] INFO - Val Acc 67.32 | Val F1 45.79
+[2026-09-07 23:08:52] INFO - Epoch 00106 | Train Loss 1.1814
+[2026-09-07 23:08:52] INFO - Val Acc 67.29 | Val F1 45.92
+[2026-09-07 23:08:52] INFO - Patience 1/30 | Best Val Acc 67.32
+[2026-09-07 23:08:52] INFO - Epoch 00107 | Train Loss 1.1710
+[2026-09-07 23:08:52] INFO - Val Acc 67.44 | Val F1 45.98
+[2026-09-07 23:08:52] INFO - Epoch 00108 | Train Loss 1.1633
+[2026-09-07 23:08:52] INFO - Val Acc 67.70 | Val F1 46.55
+[2026-09-07 23:08:52] INFO - Epoch 00109 | Train Loss 1.1613
+[2026-09-07 23:08:52] INFO - Val Acc 67.79 | Val F1 46.83
+[2026-09-07 23:08:52] INFO - Epoch 00110 | Train Loss 1.1516
+[2026-09-07 23:08:52] INFO - Val Acc 67.79 | Val F1 47.10
+[2026-09-07 23:08:52] INFO - Patience 1/30 | Best Val Acc 67.79
+[2026-09-07 23:08:53] INFO - Epoch 00111 | Train Loss 1.1424
+[2026-09-07 23:08:53] INFO - Val Acc 67.94 | Val F1 47.42
+[2026-09-07 23:08:53] INFO - Epoch 00112 | Train Loss 1.1426
+[2026-09-07 23:08:53] INFO - Val Acc 67.96 | Val F1 47.34
+[2026-09-07 23:08:53] INFO - Epoch 00113 | Train Loss 1.1405
+[2026-09-07 23:08:53] INFO - Val Acc 68.14 | Val F1 47.52
+[2026-09-07 23:08:53] INFO - Epoch 00114 | Train Loss 1.1320
+[2026-09-07 23:08:53] INFO - Val Acc 68.32 | Val F1 47.76
+[2026-09-07 23:08:54] INFO - Epoch 00115 | Train Loss 1.1304
+[2026-09-07 23:08:54] INFO - Val Acc 68.49 | Val F1 48.01
+[2026-09-07 23:08:54] INFO - Epoch 00116 | Train Loss 1.1214
+[2026-09-07 23:08:54] INFO - Val Acc 68.46 | Val F1 48.02
+[2026-09-07 23:08:54] INFO - Patience 1/30 | Best Val Acc 68.49
+[2026-09-07 23:08:54] INFO - Epoch 00117 | Train Loss 1.1135
+[2026-09-07 23:08:54] INFO - Val Acc 68.73 | Val F1 48.44
+[2026-09-07 23:08:54] INFO - Epoch 00118 | Train Loss 1.1123
+[2026-09-07 23:08:54] INFO - Val Acc 68.76 | Val F1 48.49
+[2026-09-07 23:08:54] INFO - Epoch 00119 | Train Loss 1.1007
+[2026-09-07 23:08:54] INFO - Val Acc 68.96 | Val F1 48.88
+[2026-09-07 23:08:55] INFO - Epoch 00120 | Train Loss 1.0910
+[2026-09-07 23:08:55] INFO - Val Acc 68.99 | Val F1 49.04
+[2026-09-07 23:08:55] INFO - Epoch 00121 | Train Loss 1.1020
+[2026-09-07 23:08:55] INFO - Val Acc 69.02 | Val F1 49.30
+[2026-09-07 23:08:55] INFO - Epoch 00122 | Train Loss 1.0852
+[2026-09-07 23:08:55] INFO - Val Acc 69.11 | Val F1 49.36
+[2026-09-07 23:08:55] INFO - Epoch 00123 | Train Loss 1.0877
+[2026-09-07 23:08:56] INFO - Val Acc 69.17 | Val F1 49.84
+[2026-09-07 23:08:56] INFO - Epoch 00124 | Train Loss 1.0799
+[2026-09-07 23:08:56] INFO - Val Acc 69.22 | Val F1 50.18
+[2026-09-07 23:08:56] INFO - Epoch 00125 | Train Loss 1.0741
+[2026-09-07 23:08:56] INFO - Val Acc 69.37 | Val F1 50.65
+[2026-09-07 23:08:56] INFO - Epoch 00126 | Train Loss 1.0729
+[2026-09-07 23:08:56] INFO - Val Acc 69.60 | Val F1 51.02
+[2026-09-07 23:08:56] INFO - Epoch 00127 | Train Loss 1.0709
+[2026-09-07 23:08:56] INFO - Val Acc 69.87 | Val F1 51.65
+[2026-09-07 23:08:57] INFO - Epoch 00128 | Train Loss 1.0578
+[2026-09-07 23:08:57] INFO - Val Acc 70.01 | Val F1 52.16
+[2026-09-07 23:08:57] INFO - Epoch 00129 | Train Loss 1.0519
+[2026-09-07 23:08:57] INFO - Val Acc 69.93 | Val F1 51.98
+[2026-09-07 23:08:57] INFO - Patience 1/30 | Best Val Acc 70.01
+[2026-09-07 23:08:57] INFO - Epoch 00130 | Train Loss 1.0529
+[2026-09-07 23:08:57] INFO - Val Acc 70.01 | Val F1 51.95
+[2026-09-07 23:08:57] INFO - Patience 2/30 | Best Val Acc 70.01
+[2026-09-07 23:08:57] INFO - Epoch 00131 | Train Loss 1.0418
+[2026-09-07 23:08:57] INFO - Val Acc 70.19 | Val F1 52.14
+[2026-09-07 23:08:57] INFO - Epoch 00132 | Train Loss 1.0366
+[2026-09-07 23:08:57] INFO - Val Acc 70.45 | Val F1 52.65
+[2026-09-07 23:08:58] INFO - Epoch 00133 | Train Loss 1.0393
+[2026-09-07 23:08:58] INFO - Val Acc 70.60 | Val F1 53.09
+[2026-09-07 23:08:58] INFO - Epoch 00134 | Train Loss 1.0365
+[2026-09-07 23:08:58] INFO - Val Acc 70.66 | Val F1 53.27
+[2026-09-07 23:08:58] INFO - Epoch 00135 | Train Loss 1.0225
+[2026-09-07 23:08:58] INFO - Val Acc 70.92 | Val F1 53.94
+[2026-09-07 23:08:58] INFO - Epoch 00136 | Train Loss 1.0207
+[2026-09-07 23:08:58] INFO - Val Acc 70.86 | Val F1 54.12
+[2026-09-07 23:08:58] INFO - Patience 1/30 | Best Val Acc 70.92
+[2026-09-07 23:08:58] INFO - Epoch 00137 | Train Loss 1.0222
+[2026-09-07 23:08:58] INFO - Val Acc 70.83 | Val F1 54.00
+[2026-09-07 23:08:58] INFO - Patience 2/30 | Best Val Acc 70.92
+[2026-09-07 23:08:59] INFO - Epoch 00138 | Train Loss 1.0132
+[2026-09-07 23:08:59] INFO - Val Acc 71.07 | Val F1 54.32
+[2026-09-07 23:08:59] INFO - Epoch 00139 | Train Loss 1.0183
+[2026-09-07 23:08:59] INFO - Val Acc 71.22 | Val F1 54.59
+[2026-09-07 23:08:59] INFO - Epoch 00140 | Train Loss 1.0158
+[2026-09-07 23:08:59] INFO - Val Acc 71.33 | Val F1 54.74
+[2026-09-07 23:08:59] INFO - Epoch 00141 | Train Loss 1.0047
+[2026-09-07 23:08:59] INFO - Val Acc 71.33 | Val F1 54.78
+[2026-09-07 23:08:59] INFO - Patience 1/30 | Best Val Acc 71.33
+[2026-09-07 23:09:00] INFO - Epoch 00142 | Train Loss 1.0014
+[2026-09-07 23:09:00] INFO - Val Acc 71.51 | Val F1 55.09
+[2026-09-07 23:09:00] INFO - Epoch 00143 | Train Loss 1.0025
+[2026-09-07 23:09:00] INFO - Val Acc 71.65 | Val F1 55.29
+[2026-09-07 23:09:00] INFO - Epoch 00144 | Train Loss 0.9904
+[2026-09-07 23:09:00] INFO - Val Acc 71.54 | Val F1 55.20
+[2026-09-07 23:09:00] INFO - Patience 1/30 | Best Val Acc 71.65
+[2026-09-07 23:09:00] INFO - Epoch 00145 | Train Loss 1.0004
+[2026-09-07 23:09:00] INFO - Val Acc 71.63 | Val F1 55.45
+[2026-09-07 23:09:00] INFO - Patience 2/30 | Best Val Acc 71.65
+[2026-09-07 23:09:00] INFO - Epoch 00146 | Train Loss 0.9847
+[2026-09-07 23:09:00] INFO - Val Acc 71.68 | Val F1 55.58
+[2026-09-07 23:09:01] INFO - Epoch 00147 | Train Loss 0.9831
+[2026-09-07 23:09:01] INFO - Val Acc 71.80 | Val F1 55.71
+[2026-09-07 23:09:01] INFO - Epoch 00148 | Train Loss 0.9785
+[2026-09-07 23:09:01] INFO - Val Acc 71.95 | Val F1 55.89
+[2026-09-07 23:09:01] INFO - Epoch 00149 | Train Loss 0.9741
+[2026-09-07 23:09:01] INFO - Val Acc 71.98 | Val F1 55.88
+[2026-09-07 23:09:02] INFO - Epoch 00150 | Train Loss 0.9730
+[2026-09-07 23:09:02] INFO - Val Acc 72.09 | Val F1 56.01
+[2026-09-07 23:09:02] INFO - Epoch 00151 | Train Loss 0.9715
+[2026-09-07 23:09:02] INFO - Val Acc 72.30 | Val F1 56.22
+[2026-09-07 23:09:03] INFO - Epoch 00152 | Train Loss 0.9783
+[2026-09-07 23:09:03] INFO - Val Acc 72.39 | Val F1 56.35
+[2026-09-07 23:09:03] INFO - Epoch 00153 | Train Loss 0.9635
+[2026-09-07 23:09:03] INFO - Val Acc 72.27 | Val F1 56.24
+[2026-09-07 23:09:03] INFO - Patience 1/30 | Best Val Acc 72.39
+[2026-09-07 23:09:03] INFO - Epoch 00154 | Train Loss 0.9581
+[2026-09-07 23:09:03] INFO - Val Acc 72.45 | Val F1 56.54
+[2026-09-07 23:09:03] INFO - Epoch 00155 | Train Loss 0.9560
+[2026-09-07 23:09:03] INFO - Val Acc 72.59 | Val F1 56.89
+[2026-09-07 23:09:03] INFO - Epoch 00156 | Train Loss 0.9504
+[2026-09-07 23:09:03] INFO - Val Acc 72.53 | Val F1 56.91
+[2026-09-07 23:09:03] INFO - Patience 1/30 | Best Val Acc 72.59
+[2026-09-07 23:09:04] INFO - Epoch 00157 | Train Loss 0.9429
+[2026-09-07 23:09:04] INFO - Val Acc 72.68 | Val F1 57.14
+[2026-09-07 23:09:04] INFO - Epoch 00158 | Train Loss 0.9395
+[2026-09-07 23:09:04] INFO - Val Acc 72.83 | Val F1 57.30
+[2026-09-07 23:09:04] INFO - Epoch 00159 | Train Loss 0.9358
+[2026-09-07 23:09:04] INFO - Val Acc 72.74 | Val F1 57.54
+[2026-09-07 23:09:04] INFO - Patience 1/30 | Best Val Acc 72.83
+[2026-09-07 23:09:04] INFO - Epoch 00160 | Train Loss 0.9407
+[2026-09-07 23:09:04] INFO - Val Acc 72.97 | Val F1 57.91
+[2026-09-07 23:09:05] INFO - Epoch 00161 | Train Loss 0.9272
+[2026-09-07 23:09:05] INFO - Val Acc 72.88 | Val F1 58.03
+[2026-09-07 23:09:05] INFO - Patience 1/30 | Best Val Acc 72.97
+[2026-09-07 23:09:05] INFO - Epoch 00162 | Train Loss 0.9256
+[2026-09-07 23:09:05] INFO - Val Acc 73.09 | Val F1 58.18
+[2026-09-07 23:09:05] INFO - Epoch 00163 | Train Loss 0.9174
+[2026-09-07 23:09:05] INFO - Val Acc 73.21 | Val F1 58.33
+[2026-09-07 23:09:05] INFO - Epoch 00164 | Train Loss 0.9128
+[2026-09-07 23:09:05] INFO - Val Acc 73.44 | Val F1 58.79
+[2026-09-07 23:09:05] INFO - Epoch 00165 | Train Loss 0.9246
+[2026-09-07 23:09:05] INFO - Val Acc 73.41 | Val F1 58.89
+[2026-09-07 23:09:05] INFO - Patience 1/30 | Best Val Acc 73.44
+[2026-09-07 23:09:06] INFO - Epoch 00166 | Train Loss 0.9241
+[2026-09-07 23:09:06] INFO - Val Acc 73.24 | Val F1 58.56
+[2026-09-07 23:09:06] INFO - Patience 2/30 | Best Val Acc 73.44
+[2026-09-07 23:09:06] INFO - Epoch 00167 | Train Loss 0.9091
+[2026-09-07 23:09:06] INFO - Val Acc 73.21 | Val F1 58.68
+[2026-09-07 23:09:06] INFO - Patience 3/30 | Best Val Acc 73.44
+[2026-09-07 23:09:06] INFO - Epoch 00168 | Train Loss 0.9124
+[2026-09-07 23:09:06] INFO - Val Acc 73.18 | Val F1 58.66
+[2026-09-07 23:09:06] INFO - Patience 4/30 | Best Val Acc 73.44
+[2026-09-07 23:09:06] INFO - Epoch 00169 | Train Loss 0.9104
+[2026-09-07 23:09:06] INFO - Val Acc 73.41 | Val F1 58.92
+[2026-09-07 23:09:06] INFO - Patience 5/30 | Best Val Acc 73.44
+[2026-09-07 23:09:06] INFO - Epoch 00170 | Train Loss 0.9091
+[2026-09-07 23:09:06] INFO - Val Acc 73.53 | Val F1 59.00
+[2026-09-07 23:09:07] INFO - Epoch 00171 | Train Loss 0.8950
+[2026-09-07 23:09:07] INFO - Val Acc 73.70 | Val F1 59.24
+[2026-09-07 23:09:07] INFO - Epoch 00172 | Train Loss 0.8963
+[2026-09-07 23:09:07] INFO - Val Acc 73.73 | Val F1 59.47
+[2026-09-07 23:09:07] INFO - Epoch 00173 | Train Loss 0.8836
+[2026-09-07 23:09:07] INFO - Val Acc 73.65 | Val F1 59.42
+[2026-09-07 23:09:07] INFO - Patience 1/30 | Best Val Acc 73.73
+[2026-09-07 23:09:07] INFO - Epoch 00174 | Train Loss 0.8955
+[2026-09-07 23:09:07] INFO - Val Acc 73.38 | Val F1 59.07
+[2026-09-07 23:09:07] INFO - Patience 2/30 | Best Val Acc 73.73
+[2026-09-07 23:09:08] INFO - Epoch 00175 | Train Loss 0.8858
+[2026-09-07 23:09:08] INFO - Val Acc 73.47 | Val F1 59.17
+[2026-09-07 23:09:08] INFO - Patience 3/30 | Best Val Acc 73.73
+[2026-09-07 23:09:08] INFO - Epoch 00176 | Train Loss 0.8844
+[2026-09-07 23:09:08] INFO - Val Acc 73.53 | Val F1 59.29
+[2026-09-07 23:09:08] INFO - Patience 4/30 | Best Val Acc 73.73
+[2026-09-07 23:09:08] INFO - Epoch 00177 | Train Loss 0.8775
+[2026-09-07 23:09:08] INFO - Val Acc 73.76 | Val F1 59.56
+[2026-09-07 23:09:08] INFO - Epoch 00178 | Train Loss 0.8773
+[2026-09-07 23:09:08] INFO - Val Acc 73.97 | Val F1 59.73
+[2026-09-07 23:09:09] INFO - Epoch 00179 | Train Loss 0.8791
+[2026-09-07 23:09:09] INFO - Val Acc 74.17 | Val F1 59.96
+[2026-09-07 23:09:09] INFO - Epoch 00180 | Train Loss 0.8709
+[2026-09-07 23:09:09] INFO - Val Acc 74.03 | Val F1 59.84
+[2026-09-07 23:09:09] INFO - Patience 1/30 | Best Val Acc 74.17
+[2026-09-07 23:09:09] INFO - Epoch 00181 | Train Loss 0.8668
+[2026-09-07 23:09:09] INFO - Val Acc 73.82 | Val F1 59.57
+[2026-09-07 23:09:09] INFO - Patience 2/30 | Best Val Acc 74.17
+[2026-09-07 23:09:09] INFO - Epoch 00182 | Train Loss 0.8689
+[2026-09-07 23:09:09] INFO - Val Acc 73.79 | Val F1 59.77
+[2026-09-07 23:09:09] INFO - Patience 3/30 | Best Val Acc 74.17
+[2026-09-07 23:09:09] INFO - Epoch 00183 | Train Loss 0.8701
+[2026-09-07 23:09:09] INFO - Val Acc 74.11 | Val F1 60.13
+[2026-09-07 23:09:09] INFO - Patience 4/30 | Best Val Acc 74.17
+[2026-09-07 23:09:10] INFO - Epoch 00184 | Train Loss 0.8655
+[2026-09-07 23:09:10] INFO - Val Acc 74.41 | Val F1 60.52
+[2026-09-07 23:09:10] INFO - Epoch 00185 | Train Loss 0.8582
+[2026-09-07 23:09:10] INFO - Val Acc 74.29 | Val F1 60.38
+[2026-09-07 23:09:10] INFO - Patience 1/30 | Best Val Acc 74.41
+[2026-09-07 23:09:10] INFO - Epoch 00186 | Train Loss 0.8556
+[2026-09-07 23:09:10] INFO - Val Acc 74.29 | Val F1 60.30
+[2026-09-07 23:09:10] INFO - Patience 2/30 | Best Val Acc 74.41
+[2026-09-07 23:09:10] INFO - Epoch 00187 | Train Loss 0.8533
+[2026-09-07 23:09:10] INFO - Val Acc 74.38 | Val F1 60.33
+[2026-09-07 23:09:10] INFO - Patience 3/30 | Best Val Acc 74.41
+[2026-09-07 23:09:11] INFO - Epoch 00188 | Train Loss 0.8537
+[2026-09-07 23:09:11] INFO - Val Acc 74.38 | Val F1 60.42
+[2026-09-07 23:09:11] INFO - Patience 4/30 | Best Val Acc 74.41
+[2026-09-07 23:09:11] INFO - Epoch 00189 | Train Loss 0.8462
+[2026-09-07 23:09:11] INFO - Val Acc 74.41 | Val F1 60.50
+[2026-09-07 23:09:11] INFO - Patience 5/30 | Best Val Acc 74.41
+[2026-09-07 23:09:11] INFO - Epoch 00190 | Train Loss 0.8424
+[2026-09-07 23:09:11] INFO - Val Acc 74.32 | Val F1 60.50
+[2026-09-07 23:09:11] INFO - Patience 6/30 | Best Val Acc 74.41
+[2026-09-07 23:09:11] INFO - Epoch 00191 | Train Loss 0.8442
+[2026-09-07 23:09:11] INFO - Val Acc 74.52 | Val F1 60.59
+[2026-09-07 23:09:11] INFO - Epoch 00192 | Train Loss 0.8440
+[2026-09-07 23:09:11] INFO - Val Acc 74.58 | Val F1 60.53
+[2026-09-07 23:09:12] INFO - Epoch 00193 | Train Loss 0.8355
+[2026-09-07 23:09:12] INFO - Val Acc 74.64 | Val F1 60.60
+[2026-09-07 23:09:12] INFO - Epoch 00194 | Train Loss 0.8383
+[2026-09-07 23:09:12] INFO - Val Acc 74.64 | Val F1 60.62
+[2026-09-07 23:09:12] INFO - Patience 1/30 | Best Val Acc 74.64
+[2026-09-07 23:09:12] INFO - Epoch 00195 | Train Loss 0.8347
+[2026-09-07 23:09:12] INFO - Val Acc 74.61 | Val F1 60.77
+[2026-09-07 23:09:12] INFO - Patience 2/30 | Best Val Acc 74.64
+[2026-09-07 23:09:13] INFO - Epoch 00196 | Train Loss 0.8297
+[2026-09-07 23:09:13] INFO - Val Acc 74.67 | Val F1 60.84
+[2026-09-07 23:09:13] INFO - Epoch 00197 | Train Loss 0.8267
+[2026-09-07 23:09:13] INFO - Val Acc 74.85 | Val F1 60.98
+[2026-09-07 23:09:13] INFO - Epoch 00198 | Train Loss 0.8238
+[2026-09-07 23:09:13] INFO - Val Acc 74.88 | Val F1 61.05
+[2026-09-07 23:09:13] INFO - Epoch 00199 | Train Loss 0.8193
+[2026-09-07 23:09:13] INFO - Val Acc 75.05 | Val F1 61.33
+[2026-09-07 23:09:14] INFO - Epoch 00200 | Train Loss 0.8089
+[2026-09-07 23:09:14] INFO - Val Acc 75.14 | Val F1 61.45
+[2026-09-07 23:09:14] INFO - Epoch 00201 | Train Loss 0.8105
+[2026-09-07 23:09:14] INFO - Val Acc 74.93 | Val F1 61.18
+[2026-09-07 23:09:14] INFO - Patience 1/30 | Best Val Acc 75.14
+[2026-09-07 23:09:14] INFO - Epoch 00202 | Train Loss 0.8132
+[2026-09-07 23:09:14] INFO - Val Acc 74.93 | Val F1 61.24
+[2026-09-07 23:09:14] INFO - Patience 2/30 | Best Val Acc 75.14
+[2026-09-07 23:09:14] INFO - Epoch 00203 | Train Loss 0.8072
+[2026-09-07 23:09:14] INFO - Val Acc 75.08 | Val F1 61.56
+[2026-09-07 23:09:14] INFO - Patience 3/30 | Best Val Acc 75.14
+[2026-09-07 23:09:15] INFO - Epoch 00204 | Train Loss 0.8022
+[2026-09-07 23:09:15] INFO - Val Acc 75.05 | Val F1 61.54
+[2026-09-07 23:09:15] INFO - Patience 4/30 | Best Val Acc 75.14
+[2026-09-07 23:09:15] INFO - Epoch 00205 | Train Loss 0.8053
+[2026-09-07 23:09:15] INFO - Val Acc 75.17 | Val F1 61.70
+[2026-09-07 23:09:15] INFO - Epoch 00206 | Train Loss 0.8008
+[2026-09-07 23:09:15] INFO - Val Acc 75.37 | Val F1 62.05
+[2026-09-07 23:09:15] INFO - Epoch 00207 | Train Loss 0.8037
+[2026-09-07 23:09:15] INFO - Val Acc 75.43 | Val F1 62.09
+[2026-09-07 23:09:16] INFO - Epoch 00208 | Train Loss 0.8021
+[2026-09-07 23:09:16] INFO - Val Acc 75.43 | Val F1 61.88
+[2026-09-07 23:09:16] INFO - Patience 1/30 | Best Val Acc 75.43
+[2026-09-07 23:09:16] INFO - Epoch 00209 | Train Loss 0.7956
+[2026-09-07 23:09:16] INFO - Val Acc 75.23 | Val F1 61.61
+[2026-09-07 23:09:16] INFO - Patience 2/30 | Best Val Acc 75.43
+[2026-09-07 23:09:16] INFO - Epoch 00210 | Train Loss 0.7955
+[2026-09-07 23:09:16] INFO - Val Acc 75.29 | Val F1 61.97
+[2026-09-07 23:09:16] INFO - Patience 3/30 | Best Val Acc 75.43
+[2026-09-07 23:09:17] INFO - Epoch 00211 | Train Loss 0.7899
+[2026-09-07 23:09:17] INFO - Val Acc 75.52 | Val F1 62.27
+[2026-09-07 23:09:17] INFO - Epoch 00212 | Train Loss 0.7883
+[2026-09-07 23:09:17] INFO - Val Acc 75.67 | Val F1 62.47
+[2026-09-07 23:09:17] INFO - Epoch 00213 | Train Loss 0.7848
+[2026-09-07 23:09:17] INFO - Val Acc 75.58 | Val F1 62.38
+[2026-09-07 23:09:17] INFO - Patience 1/30 | Best Val Acc 75.67
+[2026-09-07 23:09:18] INFO - Epoch 00214 | Train Loss 0.7813
+[2026-09-07 23:09:18] INFO - Val Acc 75.58 | Val F1 62.44
+[2026-09-07 23:09:18] INFO - Patience 2/30 | Best Val Acc 75.67
+[2026-09-07 23:09:18] INFO - Epoch 00215 | Train Loss 0.7770
+[2026-09-07 23:09:18] INFO - Val Acc 75.58 | Val F1 62.44
+[2026-09-07 23:09:18] INFO - Patience 3/30 | Best Val Acc 75.67
+[2026-09-07 23:09:18] INFO - Epoch 00216 | Train Loss 0.7829
+[2026-09-07 23:09:18] INFO - Val Acc 75.64 | Val F1 62.45
+[2026-09-07 23:09:18] INFO - Patience 4/30 | Best Val Acc 75.67
+[2026-09-07 23:09:18] INFO - Epoch 00217 | Train Loss 0.7806
+[2026-09-07 23:09:19] INFO - Val Acc 75.64 | Val F1 62.38
+[2026-09-07 23:09:19] INFO - Patience 5/30 | Best Val Acc 75.67
+[2026-09-07 23:09:19] INFO - Epoch 00218 | Train Loss 0.7650
+[2026-09-07 23:09:19] INFO - Val Acc 75.72 | Val F1 62.40
+[2026-09-07 23:09:19] INFO - Epoch 00219 | Train Loss 0.7632
+[2026-09-07 23:09:19] INFO - Val Acc 75.75 | Val F1 62.62
+[2026-09-07 23:09:19] INFO - Epoch 00220 | Train Loss 0.7651
+[2026-09-07 23:09:19] INFO - Val Acc 75.75 | Val F1 62.64
+[2026-09-07 23:09:19] INFO - Patience 1/30 | Best Val Acc 75.75
+[2026-09-07 23:09:20] INFO - Epoch 00221 | Train Loss 0.7579
+[2026-09-07 23:09:20] INFO - Val Acc 75.72 | Val F1 62.58
+[2026-09-07 23:09:20] INFO - Patience 2/30 | Best Val Acc 75.75
+[2026-09-07 23:09:20] INFO - Epoch 00222 | Train Loss 0.7536
+[2026-09-07 23:09:20] INFO - Val Acc 75.70 | Val F1 62.67
+[2026-09-07 23:09:20] INFO - Patience 3/30 | Best Val Acc 75.75
+[2026-09-07 23:09:20] INFO - Epoch 00223 | Train Loss 0.7720
+[2026-09-07 23:09:20] INFO - Val Acc 75.90 | Val F1 62.87
+[2026-09-07 23:09:20] INFO - Epoch 00224 | Train Loss 0.7626
+[2026-09-07 23:09:20] INFO - Val Acc 76.05 | Val F1 63.04
+[2026-09-07 23:09:21] INFO - Epoch 00225 | Train Loss 0.7586
+[2026-09-07 23:09:21] INFO - Val Acc 75.96 | Val F1 62.97
+[2026-09-07 23:09:21] INFO - Patience 1/30 | Best Val Acc 76.05
+[2026-09-07 23:09:21] INFO - Epoch 00226 | Train Loss 0.7601
+[2026-09-07 23:09:21] INFO - Val Acc 75.84 | Val F1 62.96
+[2026-09-07 23:09:21] INFO - Patience 2/30 | Best Val Acc 76.05
+[2026-09-07 23:09:21] INFO - Epoch 00227 | Train Loss 0.7486
+[2026-09-07 23:09:21] INFO - Val Acc 75.93 | Val F1 62.98
+[2026-09-07 23:09:21] INFO - Patience 3/30 | Best Val Acc 76.05
+[2026-09-07 23:09:21] INFO - Epoch 00228 | Train Loss 0.7466
+[2026-09-07 23:09:21] INFO - Val Acc 75.75 | Val F1 62.69
+[2026-09-07 23:09:21] INFO - Patience 4/30 | Best Val Acc 76.05
+[2026-09-07 23:09:21] INFO - Epoch 00229 | Train Loss 0.7464
+[2026-09-07 23:09:21] INFO - Val Acc 75.81 | Val F1 62.76
+[2026-09-07 23:09:21] INFO - Patience 5/30 | Best Val Acc 76.05
+[2026-09-07 23:09:22] INFO - Epoch 00230 | Train Loss 0.7398
+[2026-09-07 23:09:22] INFO - Val Acc 75.75 | Val F1 62.79
+[2026-09-07 23:09:22] INFO - Patience 6/30 | Best Val Acc 76.05
+[2026-09-07 23:09:22] INFO - Epoch 00231 | Train Loss 0.7423
+[2026-09-07 23:09:22] INFO - Val Acc 75.93 | Val F1 63.08
+[2026-09-07 23:09:22] INFO - Patience 7/30 | Best Val Acc 76.05
+[2026-09-07 23:09:22] INFO - Epoch 00232 | Train Loss 0.7414
+[2026-09-07 23:09:22] INFO - Val Acc 75.90 | Val F1 63.05
+[2026-09-07 23:09:22] INFO - Patience 8/30 | Best Val Acc 76.05
+[2026-09-07 23:09:22] INFO - Epoch 00233 | Train Loss 0.7381
+[2026-09-07 23:09:22] INFO - Val Acc 75.93 | Val F1 63.06
+[2026-09-07 23:09:22] INFO - Patience 9/30 | Best Val Acc 76.05
+[2026-09-07 23:09:22] INFO - Epoch 00234 | Train Loss 0.7340
+[2026-09-07 23:09:22] INFO - Val Acc 75.96 | Val F1 63.12
+[2026-09-07 23:09:22] INFO - Patience 10/30 | Best Val Acc 76.05
+[2026-09-07 23:09:23] INFO - Epoch 00235 | Train Loss 0.7374
+[2026-09-07 23:09:23] INFO - Val Acc 75.96 | Val F1 63.07
+[2026-09-07 23:09:23] INFO - Patience 11/30 | Best Val Acc 76.05
+[2026-09-07 23:09:23] INFO - Epoch 00236 | Train Loss 0.7275
+[2026-09-07 23:09:23] INFO - Val Acc 75.87 | Val F1 62.92
+[2026-09-07 23:09:23] INFO - Patience 12/30 | Best Val Acc 76.05
+[2026-09-07 23:09:23] INFO - Epoch 00237 | Train Loss 0.7285
+[2026-09-07 23:09:23] INFO - Val Acc 75.90 | Val F1 63.05
+[2026-09-07 23:09:23] INFO - Patience 13/30 | Best Val Acc 76.05
+[2026-09-07 23:09:23] INFO - Epoch 00238 | Train Loss 0.7230
+[2026-09-07 23:09:23] INFO - Val Acc 75.96 | Val F1 63.44
+[2026-09-07 23:09:23] INFO - Patience 14/30 | Best Val Acc 76.05
+[2026-09-07 23:09:24] INFO - Epoch 00239 | Train Loss 0.7255
+[2026-09-07 23:09:24] INFO - Val Acc 75.99 | Val F1 63.50
+[2026-09-07 23:09:24] INFO - Patience 15/30 | Best Val Acc 76.05
+[2026-09-07 23:09:24] INFO - Epoch 00240 | Train Loss 0.7249
+[2026-09-07 23:09:24] INFO - Val Acc 76.02 | Val F1 63.46
+[2026-09-07 23:09:24] INFO - Patience 16/30 | Best Val Acc 76.05
+[2026-09-07 23:09:24] INFO - Epoch 00241 | Train Loss 0.7238
+[2026-09-07 23:09:24] INFO - Val Acc 76.19 | Val F1 63.67
+[2026-09-07 23:09:24] INFO - Epoch 00242 | Train Loss 0.7161
+[2026-09-07 23:09:24] INFO - Val Acc 76.05 | Val F1 63.60
+[2026-09-07 23:09:24] INFO - Patience 1/30 | Best Val Acc 76.19
+[2026-09-07 23:09:24] INFO - Epoch 00243 | Train Loss 0.7204
+[2026-09-07 23:09:24] INFO - Val Acc 76.11 | Val F1 63.65
+[2026-09-07 23:09:24] INFO - Patience 2/30 | Best Val Acc 76.19
+[2026-09-07 23:09:25] INFO - Epoch 00244 | Train Loss 0.7151
+[2026-09-07 23:09:25] INFO - Val Acc 76.19 | Val F1 63.69
+[2026-09-07 23:09:25] INFO - Patience 3/30 | Best Val Acc 76.19
+[2026-09-07 23:09:25] INFO - Epoch 00245 | Train Loss 0.7050
+[2026-09-07 23:09:25] INFO - Val Acc 76.11 | Val F1 63.64
+[2026-09-07 23:09:25] INFO - Patience 4/30 | Best Val Acc 76.19
+[2026-09-07 23:09:25] INFO - Epoch 00246 | Train Loss 0.7047
+[2026-09-07 23:09:25] INFO - Val Acc 76.11 | Val F1 63.67
+[2026-09-07 23:09:25] INFO - Patience 5/30 | Best Val Acc 76.19
+[2026-09-07 23:09:25] INFO - Epoch 00247 | Train Loss 0.7141
+[2026-09-07 23:09:25] INFO - Val Acc 76.08 | Val F1 63.61
+[2026-09-07 23:09:25] INFO - Patience 6/30 | Best Val Acc 76.19
+[2026-09-07 23:09:25] INFO - Epoch 00248 | Train Loss 0.7019
+[2026-09-07 23:09:25] INFO - Val Acc 76.02 | Val F1 63.61
+[2026-09-07 23:09:25] INFO - Patience 7/30 | Best Val Acc 76.19
+[2026-09-07 23:09:25] INFO - Epoch 00249 | Train Loss 0.7045
+[2026-09-07 23:09:25] INFO - Val Acc 76.08 | Val F1 63.68
+[2026-09-07 23:09:25] INFO - Patience 8/30 | Best Val Acc 76.19
+[2026-09-07 23:09:26] INFO - Epoch 00250 | Train Loss 0.6982
+[2026-09-07 23:09:26] INFO - Val Acc 76.19 | Val F1 63.74
+[2026-09-07 23:09:26] INFO - Patience 9/30 | Best Val Acc 76.19
+[2026-09-07 23:09:26] INFO - Epoch 00251 | Train Loss 0.7030
+[2026-09-07 23:09:26] INFO - Val Acc 76.25 | Val F1 63.85
+[2026-09-07 23:09:26] INFO - Epoch 00252 | Train Loss 0.6925
+[2026-09-07 23:09:26] INFO - Val Acc 76.37 | Val F1 63.94
+[2026-09-07 23:09:26] INFO - Epoch 00253 | Train Loss 0.6900
+[2026-09-07 23:09:26] INFO - Val Acc 76.34 | Val F1 63.72
+[2026-09-07 23:09:26] INFO - Patience 1/30 | Best Val Acc 76.37
+[2026-09-07 23:09:27] INFO - Epoch 00254 | Train Loss 0.6957
+[2026-09-07 23:09:27] INFO - Val Acc 76.28 | Val F1 63.76
+[2026-09-07 23:09:27] INFO - Patience 2/30 | Best Val Acc 76.37
+[2026-09-07 23:09:27] INFO - Epoch 00255 | Train Loss 0.6886
+[2026-09-07 23:09:27] INFO - Val Acc 76.16 | Val F1 63.73
+[2026-09-07 23:09:27] INFO - Patience 3/30 | Best Val Acc 76.37
+[2026-09-07 23:09:27] INFO - Epoch 00256 | Train Loss 0.6918
+[2026-09-07 23:09:27] INFO - Val Acc 76.13 | Val F1 63.64
+[2026-09-07 23:09:27] INFO - Patience 4/30 | Best Val Acc 76.37
+[2026-09-07 23:09:27] INFO - Epoch 00257 | Train Loss 0.6868
+[2026-09-07 23:09:27] INFO - Val Acc 76.19 | Val F1 63.84
+[2026-09-07 23:09:27] INFO - Patience 5/30 | Best Val Acc 76.37
+[2026-09-07 23:09:28] INFO - Epoch 00258 | Train Loss 0.6850
+[2026-09-07 23:09:28] INFO - Val Acc 76.19 | Val F1 63.89
+[2026-09-07 23:09:28] INFO - Patience 6/30 | Best Val Acc 76.37
+[2026-09-07 23:09:28] INFO - Epoch 00259 | Train Loss 0.6807
+[2026-09-07 23:09:28] INFO - Val Acc 76.31 | Val F1 64.01
+[2026-09-07 23:09:28] INFO - Patience 7/30 | Best Val Acc 76.37
+[2026-09-07 23:09:28] INFO - Epoch 00260 | Train Loss 0.6781
+[2026-09-07 23:09:28] INFO - Val Acc 76.31 | Val F1 64.05
+[2026-09-07 23:09:28] INFO - Patience 8/30 | Best Val Acc 76.37
+[2026-09-07 23:09:28] INFO - Epoch 00261 | Train Loss 0.6759
+[2026-09-07 23:09:28] INFO - Val Acc 76.37 | Val F1 63.97
+[2026-09-07 23:09:28] INFO - Patience 9/30 | Best Val Acc 76.37
+[2026-09-07 23:09:29] INFO - Epoch 00262 | Train Loss 0.6791
+[2026-09-07 23:09:29] INFO - Val Acc 76.37 | Val F1 63.87
+[2026-09-07 23:09:29] INFO - Patience 10/30 | Best Val Acc 76.37
+[2026-09-07 23:09:29] INFO - Epoch 00263 | Train Loss 0.6740
+[2026-09-07 23:09:29] INFO - Val Acc 76.40 | Val F1 63.93
+[2026-09-07 23:09:29] INFO - Epoch 00264 | Train Loss 0.6755
+[2026-09-07 23:09:29] INFO - Val Acc 76.43 | Val F1 63.99
+[2026-09-07 23:09:29] INFO - Epoch 00265 | Train Loss 0.6708
+[2026-09-07 23:09:29] INFO - Val Acc 76.40 | Val F1 64.13
+[2026-09-07 23:09:29] INFO - Patience 1/30 | Best Val Acc 76.43
+[2026-09-07 23:09:29] INFO - Epoch 00266 | Train Loss 0.6641
+[2026-09-07 23:09:29] INFO - Val Acc 76.37 | Val F1 64.18
+[2026-09-07 23:09:29] INFO - Patience 2/30 | Best Val Acc 76.43
+[2026-09-07 23:09:30] INFO - Epoch 00267 | Train Loss 0.6583
+[2026-09-07 23:09:30] INFO - Val Acc 76.46 | Val F1 64.14
+[2026-09-07 23:09:30] INFO - Epoch 00268 | Train Loss 0.6682
+[2026-09-07 23:09:30] INFO - Val Acc 76.69 | Val F1 64.52
+[2026-09-07 23:09:30] INFO - Epoch 00269 | Train Loss 0.6598
+[2026-09-07 23:09:30] INFO - Val Acc 76.60 | Val F1 64.28
+[2026-09-07 23:09:30] INFO - Patience 1/30 | Best Val Acc 76.69
+[2026-09-07 23:09:30] INFO - Epoch 00270 | Train Loss 0.6615
+[2026-09-07 23:09:30] INFO - Val Acc 76.66 | Val F1 64.38
+[2026-09-07 23:09:30] INFO - Patience 2/30 | Best Val Acc 76.69
+[2026-09-07 23:09:31] INFO - Epoch 00271 | Train Loss 0.6616
+[2026-09-07 23:09:31] INFO - Val Acc 76.66 | Val F1 64.41
+[2026-09-07 23:09:31] INFO - Patience 3/30 | Best Val Acc 76.69
+[2026-09-07 23:09:31] INFO - Epoch 00272 | Train Loss 0.6525
+[2026-09-07 23:09:31] INFO - Val Acc 76.57 | Val F1 64.25
+[2026-09-07 23:09:31] INFO - Patience 4/30 | Best Val Acc 76.69
+[2026-09-07 23:09:31] INFO - Epoch 00273 | Train Loss 0.6524
+[2026-09-07 23:09:31] INFO - Val Acc 76.52 | Val F1 64.20
+[2026-09-07 23:09:31] INFO - Patience 5/30 | Best Val Acc 76.69
+[2026-09-07 23:09:31] INFO - Epoch 00274 | Train Loss 0.6556
+[2026-09-07 23:09:31] INFO - Val Acc 76.46 | Val F1 64.29
+[2026-09-07 23:09:31] INFO - Patience 6/30 | Best Val Acc 76.69
+[2026-09-07 23:09:31] INFO - Epoch 00275 | Train Loss 0.6541
+[2026-09-07 23:09:31] INFO - Val Acc 76.54 | Val F1 64.35
+[2026-09-07 23:09:31] INFO - Patience 7/30 | Best Val Acc 76.69
+[2026-09-07 23:09:32] INFO - Epoch 00276 | Train Loss 0.6513
+[2026-09-07 23:09:32] INFO - Val Acc 76.60 | Val F1 64.44
+[2026-09-07 23:09:32] INFO - Patience 8/30 | Best Val Acc 76.69
+[2026-09-07 23:09:32] INFO - Epoch 00277 | Train Loss 0.6502
+[2026-09-07 23:09:32] INFO - Val Acc 76.54 | Val F1 64.42
+[2026-09-07 23:09:32] INFO - Patience 9/30 | Best Val Acc 76.69
+[2026-09-07 23:09:32] INFO - Epoch 00278 | Train Loss 0.6399
+[2026-09-07 23:09:32] INFO - Val Acc 76.49 | Val F1 64.28
+[2026-09-07 23:09:32] INFO - Patience 10/30 | Best Val Acc 76.69
+[2026-09-07 23:09:32] INFO - Epoch 00279 | Train Loss 0.6462
+[2026-09-07 23:09:32] INFO - Val Acc 76.63 | Val F1 64.32
+[2026-09-07 23:09:32] INFO - Patience 11/30 | Best Val Acc 76.69
+[2026-09-07 23:09:32] INFO - Epoch 00280 | Train Loss 0.6445
+[2026-09-07 23:09:32] INFO - Val Acc 76.69 | Val F1 64.40
+[2026-09-07 23:09:32] INFO - Patience 12/30 | Best Val Acc 76.69
+[2026-09-07 23:09:33] INFO - Epoch 00281 | Train Loss 0.6431
+[2026-09-07 23:09:33] INFO - Val Acc 76.66 | Val F1 64.45
+[2026-09-07 23:09:33] INFO - Patience 13/30 | Best Val Acc 76.69
+[2026-09-07 23:09:33] INFO - Epoch 00282 | Train Loss 0.6466
+[2026-09-07 23:09:33] INFO - Val Acc 76.66 | Val F1 64.48
+[2026-09-07 23:09:33] INFO - Patience 14/30 | Best Val Acc 76.69
+[2026-09-07 23:09:33] INFO - Epoch 00283 | Train Loss 0.6378
+[2026-09-07 23:09:33] INFO - Val Acc 76.63 | Val F1 64.50
+[2026-09-07 23:09:33] INFO - Patience 15/30 | Best Val Acc 76.69
+[2026-09-07 23:09:33] INFO - Epoch 00284 | Train Loss 0.6324
+[2026-09-07 23:09:33] INFO - Val Acc 76.63 | Val F1 64.56
+[2026-09-07 23:09:33] INFO - Patience 16/30 | Best Val Acc 76.69
+[2026-09-07 23:09:34] INFO - Epoch 00285 | Train Loss 0.6400
+[2026-09-07 23:09:34] INFO - Val Acc 76.69 | Val F1 64.35
+[2026-09-07 23:09:34] INFO - Patience 17/30 | Best Val Acc 76.69
+[2026-09-07 23:09:34] INFO - Epoch 00286 | Train Loss 0.6300
+[2026-09-07 23:09:34] INFO - Val Acc 76.66 | Val F1 64.38
+[2026-09-07 23:09:34] INFO - Patience 18/30 | Best Val Acc 76.69
+[2026-09-07 23:09:34] INFO - Epoch 00287 | Train Loss 0.6262
+[2026-09-07 23:09:34] INFO - Val Acc 76.93 | Val F1 64.60
+[2026-09-07 23:09:34] INFO - Epoch 00288 | Train Loss 0.6236
+[2026-09-07 23:09:34] INFO - Val Acc 77.04 | Val F1 64.79
+[2026-09-07 23:09:34] INFO - Epoch 00289 | Train Loss 0.6252
+[2026-09-07 23:09:34] INFO - Val Acc 76.95 | Val F1 64.81
+[2026-09-07 23:09:34] INFO - Patience 1/30 | Best Val Acc 77.04
+[2026-09-07 23:09:35] INFO - Epoch 00290 | Train Loss 0.6232
+[2026-09-07 23:09:35] INFO - Val Acc 76.75 | Val F1 64.72
+[2026-09-07 23:09:35] INFO - Patience 2/30 | Best Val Acc 77.04
+[2026-09-07 23:09:35] INFO - Epoch 00291 | Train Loss 0.6301
+[2026-09-07 23:09:35] INFO - Val Acc 76.90 | Val F1 64.83
+[2026-09-07 23:09:35] INFO - Patience 3/30 | Best Val Acc 77.04
+[2026-09-07 23:09:35] INFO - Epoch 00292 | Train Loss 0.6253
+[2026-09-07 23:09:35] INFO - Val Acc 76.95 | Val F1 64.88
+[2026-09-07 23:09:35] INFO - Patience 4/30 | Best Val Acc 77.04
+[2026-09-07 23:09:35] INFO - Epoch 00293 | Train Loss 0.6152
+[2026-09-07 23:09:35] INFO - Val Acc 77.07 | Val F1 64.97
+[2026-09-07 23:09:35] INFO - Epoch 00294 | Train Loss 0.6153
+[2026-09-07 23:09:35] INFO - Val Acc 77.04 | Val F1 64.95
+[2026-09-07 23:09:35] INFO - Patience 1/30 | Best Val Acc 77.07
+[2026-09-07 23:09:36] INFO - Epoch 00295 | Train Loss 0.6205
+[2026-09-07 23:09:36] INFO - Val Acc 76.90 | Val F1 64.89
+[2026-09-07 23:09:36] INFO - Patience 2/30 | Best Val Acc 77.07
+[2026-09-07 23:09:36] INFO - Epoch 00296 | Train Loss 0.6156
+[2026-09-07 23:09:36] INFO - Val Acc 76.90 | Val F1 64.91
+[2026-09-07 23:09:36] INFO - Patience 3/30 | Best Val Acc 77.07
+[2026-09-07 23:09:36] INFO - Epoch 00297 | Train Loss 0.6149
+[2026-09-07 23:09:36] INFO - Val Acc 76.81 | Val F1 64.72
+[2026-09-07 23:09:36] INFO - Patience 4/30 | Best Val Acc 77.07
+[2026-09-07 23:09:36] INFO - Epoch 00298 | Train Loss 0.6072
+[2026-09-07 23:09:36] INFO - Val Acc 76.81 | Val F1 64.65
+[2026-09-07 23:09:36] INFO - Patience 5/30 | Best Val Acc 77.07
+[2026-09-07 23:09:37] INFO - Epoch 00299 | Train Loss 0.6112
+[2026-09-07 23:09:37] INFO - Val Acc 77.01 | Val F1 64.86
+[2026-09-07 23:09:37] INFO - Patience 6/30 | Best Val Acc 77.07
+[2026-09-07 23:09:37] INFO - Epoch 00300 | Train Loss 0.6047
+[2026-09-07 23:09:37] INFO - Val Acc 77.07 | Val F1 64.91
+[2026-09-07 23:09:37] INFO - Patience 7/30 | Best Val Acc 77.07
+[2026-09-07 23:09:37] INFO - [Run 1] Best Val Acc 77.07
+[2026-09-07 23:09:37] INFO - [Run 1] Final Test Acc 77.98 | Final Test F1 66.59
+[2026-09-07 23:09:37] INFO - ============================================================
+[2026-09-07 23:09:37] INFO - Final Results over 1 runs
+[2026-09-07 23:09:37] INFO - ============================================================
+[2026-09-07 23:09:37] INFO - Highest Valid Acc: 77.07 ± 0.00
+[2026-09-07 23:09:37] INFO - Test Acc: 77.98 ± 0.00
+[2026-09-07 23:09:37] INFO - Test Macro-F1: 66.59 ± 0.00
+[2026-09-07 23:09:37] INFO - ============================================================
+[2026-09-07 23:09:37] INFO - Saved results: /hdd1/DataInHere/YHF/exp/experiments/r0/results/Grocery/seed_42/train_mlp/results.json
