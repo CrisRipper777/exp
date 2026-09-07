@@ -1,0 +1,54 @@
+name: biaxis_r2_relfunc
+
+# =========================================================================
+# Bi-Axis R2-Design-2.8 v2 — relational function decomposition with
+# identifiability controls
+# (docs/BiAxis_R2_Design_2_8_v2_Identifiable_Relational_Function_Decomposition.md)
+#
+#   m_i^b = sum_a lambda_i^{ab} r_i^{ab} sum_j pi_ji^{ab} Ohat_ji^{ab}(U_a F_j^a)
+#
+#   lambda : simplex over source factor a     (Rule III)
+#   pi     : simplex over real neighbors only (Rule II, no null inside pi)
+#   r      : exposure scalar in [0,1]         (Rule I)
+#   Ohat   : content operator, NormMatch in the primary diagnostic (Rule IV)
+#
+# exposure:    fixed_full | node | target | source | pair      (D2.8-B)
+# composition: uniform | generic | target | source | pair     (D2.8-C)
+# channel:     mean | softmax | concat | attn                  (D2.8-D)
+# operator:    linear | static_pair | target_film | edge_film | basis  (D2.8-E)
+#
+# freeze_* flags implement staged freezing (Rule V): previously selected
+# functions are loaded from the previous stage's checkpoint and frozen while
+# the new function is trained. Joint co-training is only a secondary
+# confirmation after a single-mechanism GO.
+# =========================================================================
+
+exposure: fixed_full
+composition: uniform
+channel: mean
+operator: linear
+
+# Rule IV: primary operator diagnostic uses NormMatch (content vs magnitude);
+# norm_match=false is reserved for the secondary unrestricted-operator test.
+norm_match: true
+# M2/M3 MEAN_DUP matched capacity controls feed the mean message to all slots
+mean_dup: false
+# O4 controls
+uniform_router: false
+target_router: false
+basis_k: 4
+
+# Rule V staged freezing (set by each stage's driver)
+freeze_exposure: false
+freeze_composition: false
+freeze_channel: false
+freeze_operator: false
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+type_dim: 16
+edge_chunk_size: 50000

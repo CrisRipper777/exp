@@ -1,0 +1,84 @@
+name: biaxis_r3
+
+# =========================================================================
+# Bi-Axis MAG — R3 Ownership-Structured Semantic Transition Network
+# (docs/R3_Ownership_Structured_Transition_阶段推进计划.md, §2-§14)
+#
+# Stage I  : P0 Semantic Ownership factorization (C / Pt / Pv), unchanged.
+# Stage II : L ownership-structured semantic transition layers. Each layer
+#            re-computes the same-node context, the semantic->relational
+#            projections, the 3x3 ownership transition (static diagonal +
+#            off-diagonal functional operator), pre-aggregation messages,
+#            mean neighbor aggregation and the target pre-LN residual
+#            update.
+# Stage III: factor-wise multi-scale retention + the P0 concat+MLP fusion.
+#
+# Every R3 variant (plan §21: V0-V6) is a combination of the switches
+# below; there are NO per-variant model files (plan §16.1).
+# =========================================================================
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+# P0 auxiliary objective (unchanged from biaxis_final)
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+# Unified NC protocol.
+lr: 0.001
+weight_decay: 0.0001
+
+transition:
+  # --- Stage II: ownership-structured semantic transition ---
+  num_transition_layers: 2
+  relation_dim: 128
+  factor_id_dim: 16
+  context_dim: 64
+  # diagonal: off-diagonal disabled (block-diagonal ownership propagation)
+  # static  : fixed per-(a,b) cross-ownership linear transfer
+  # film    : descriptor-conditioned feature-wise affine modulation
+  # basis   : shared low-rank dynamic functional bases (the R3 core operator)
+  transition_mode: basis
+  cross_factor: true
+  use_dual_space: true
+  use_same_node_context: true
+  preserve_source_channels: true
+
+  # --- dynamic functional basis (plan §4.3) ---
+  num_bases: 4
+  basis_rank: 16
+  router_hidden_dim: 128
+  # small-but-nonzero init (plan §4.4): 0.0 is reserved for the frozen-zero
+  # test mode and must never be used in real experiments (plan §16.6)
+  offdiag_init_scale: 0.1
+  layer_scale_init: 0.1
+
+  # --- aggregation (plan §5: v1 only mean) ---
+  neighbor_aggregation: mean
+
+  # --- readout (plan §9/§10) ---
+  multi_scale: concat # last | concat
+  fusion: concat_mlp
+
+  # --- optional (plan §12: NOT implemented in R3-v1, must stay false) ---
+  use_exposure: false
+
+  # --- memory (plan §17; the p3/CORT ele-fashion fix) ---
+  # per-chunk message segments run under activation checkpointing: the
+  # [E, d]-level router/basis intermediates are recomputed in backward
+  # instead of retained. The segments are randomness-free (no dropout
+  # inside router/context/basis) -> recomputation is bitwise identical.
+  memory_checkpoint: true
+
+  # --- logging / debug (plan §18) ---
+  log_transition_stats: true
+  log_basis_stats: true
+  log_grad_stats: false
+  edge_chunk_size: 200000

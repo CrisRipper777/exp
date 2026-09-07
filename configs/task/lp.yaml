@@ -1,0 +1,51 @@
+name: lp
+
+# RPTA-style sampled LP protocol (reference: RPTA docs/lp_protocol.md):
+# LinkNeighborLoader with 2-hop bidirectional subgraphs, 1 filtered negative
+# per positive, supervision edges masked from the message graph, full-budget
+# training with the best val-MRR checkpoint, pessimistic ranking ties.
+optimizer: adam # RPTA LP uses Adam
+
+epochs: 150
+lr: 1e-3
+weight_decay: 1e-5
+# Models may override lr / weight_decay via their own config (official presets).
+patience: null # null = run the full epoch budget (RPTA-style)
+early_stop_min_epoch: 1
+grad_clip: null
+
+batch_size: 2048
+num_neighbors: [5, 5] # 2-hop
+subgraph_type: bidirectional
+num_train_neg: 1
+# v7 data-pipeline optimizations (RPTA LP_SPEED_OPTIMIZATION.md):
+# parallel loader workers + prefetch and bounded CPU tensor threads.
+loader_num_workers: 4
+loader_prefetch_factor: 2
+torch_threads: 8
+
+inference_mode: full # 'full' or 'layerwise'
+inference_batch_size: 4096
+eval_preload_node_emb: true
+eval_every: 2
+# 限制每个 epoch 实际训练多少个 mini-batch，null 表示不限制
+max_train_batches: null
+# null = use all positives; int = sample this many per epoch
+# 限制每个 epoch 一开始采样多少条训练正边
+train_pos_per_epoch: null
+eval_edge_batch_size: 512
+# Optional: save best checkpoint (model+predictor) for offline P0 factor probes.
+# null = do not save (default behavior unchanged).
+save_ckpt_path: null
+
+loss:
+  aux_weight: 1.0
+
+decoder:
+  name: mlp
+  hidden_dim: 256
+  num_layers: 3
+  dropout: 0.02
+  # RPTA shared embedding dimension: every encoder output is projected to
+  # this dim so the predictor sees identical capacity across models.
+  proj_dim: 128

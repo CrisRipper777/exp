@@ -1,0 +1,48 @@
+name: biaxis_p0
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+# In-model aux loss weights (plan §4, option A: runner aux_weight stays 1.0).
+# 2026-09-01 D1 screening: with (0.1, 0.01, 0.1) the Common factor collapsed on
+# ele-fashion (effrank_c=1.9/128, common_sim=1.000) because L_common has a
+# trivial constant-c optimum. (0.02, 0.01, 0.3) recovers effrank_c=19.5 with
+# unchanged task accuracy and S_C >> S_P (plan §4.4 "collapse 再调整").
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+
+# Below this batch size the cross-covariance orthogonality loss falls back to
+# squared-cosine overlap.
+orth_fallback_batch: 16
+
+# P0 topology-free factorizer: never use full-graph training.
+full_graph_training: false
+
+# P0 diagnostics settings (consumed by pipeline scripts, not by the model).
+p0:
+  diagnostics: true
+  max_diag_nodes: 10000
+  max_diag_edges: 500000
+  edge_top_ratios: [0.1, 0.2]
+  gap_threshold: 0.25
+
+  probe:
+    epochs: 200
+    patience: 20
+    lr: 0.001
+    weight_decay: 0.0001
+
+    lp:
+      # LP probe protocol (identical across all factor/mode probes).
+      num_train_neg: 1
+      # Cap train positives per epoch (same knob as the main LP protocol).
+      train_pos_per_epoch: 200000
+      # Fixed validation subset size for early stopping; null = full val.
+      eval_subset_size: 30000
+      decoder_hidden_dim: 256
+      decoder_num_layers: 3
+      decoder_dropout: 0.02

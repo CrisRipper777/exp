@@ -1,0 +1,98 @@
+name: biaxis_cort
+
+# =========================================================================
+# Bi-Axis MAG — R2D29 CORT: Coordinated Ownership-Relational Transfer
+# (docs/BiAxis_R2D29_System_Level_Performance_Advancement_Plan.md).
+#
+# A0 (biaxis_final) structure is inherited and REUSED as the strong path /
+# warm start (plan §2.1); the CORT block adds the complete pathway:
+#   Relational Allocation -> Source Preservation -> Target-conditioned
+#   Interaction -> Ownership-state Update -> Ownership Interaction Fusion.
+#
+# Every knob below is a config axis of the architecture search (plan §6.2).
+# NEVER modify biaxis_p0/p1/p2/p3/final/r2_relfunc configs or code.
+# =========================================================================
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+# Unified NC protocol.
+lr: 0.001
+weight_decay: 0.0001
+
+# --- P1 relation decomposition (A0 M2, reused unchanged) ---
+p1:
+  factor_aware: true
+  num_relations: 4
+  relation_dim: 32
+  relation_temperature: 0.5
+  selector_hidden_dim: 64
+  selector_input_norm: null
+  budget_hidden_dim: 64
+  use_graph_budget: true
+  budget_shared: false
+  eps: 1.0e-8
+  relation_balance_weight: 0.0
+  alpha_entropy_weight: 0.0
+  budget_reg_weight: 0.0
+  edge_chunk_size: 500000
+
+# --- P2 transport coupling (A0, reused unchanged) ---
+p2:
+  mode: null_softmax
+  score_hidden_dim: 64
+  epsilon: 0.2
+  tau_base: 1.0
+  sinkhorn_iters: 10
+  null_prior: 0.5
+  null_score_init: 0.0
+  deterministic: false
+  detach_capacity_prior: true
+  detach_relation_confidence: true
+  eps: 1.0e-8
+
+# --- P3 final operator (A0, reused unchanged) ---
+p3:
+  operator_mode: full_interaction
+  operator_reg_weight: 0.0
+  interaction_reg_weight: 0.0
+  memory_checkpoint: true
+
+# --- CORT pathway (plan §6.2) ---
+cort:
+  # a0_augment | pre_a0 | sandwich | replace | hybrid
+  backbone_mode: a0_augment
+  # uniform | target_null | pair_null
+  router_mode: pair_null
+  # mean | preserve_concat | preserve_attn
+  source_mode: preserve_concat
+  # late | factor
+  writeback_mode: factor
+  # legacy | oif | factor_attn
+  fusion_mode: legacy
+  num_blocks: 1
+  num_blocks_pre: 1
+  num_blocks_post: 1
+  share_blocks: false
+  interaction_hidden_mult: 2.0
+  fusion_hidden_mult: 2.0
+  residual_init: 0.0
+  pre_norm: true
+  dropout: 0.2
+  edge_chunk_size: 50000
+  # activation checkpointing of the per-pair score segment (D2.7 OOM fix)
+  memory_checkpoint: true
+  type_dim: 16
+  # matched control for preserve_concat: mean message duplicated into the
+  # 3 channels, then the exact same concat-MLP path (plan §7.5)
+  mean_dup: false

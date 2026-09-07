@@ -1,0 +1,15 @@
+name: sports-copurchase
+source: mmgraph
+tasks: [lp]
+
+root: ${paths.data_root}/sports-copurchase
+joint_feat_path: ${dataset.root}/clip_feat.pt
+# MM-Graph precomputed *_feat.pt files are [x_t, x_i]:
+# clip=512+512, imagebind=1024+1024, t5dino/t5vit=768+768.
+edge_split_path: ${dataset.root}/lp-edge-split.pt
+
+feature_dtype: float32
+text_dim: 512
+visual_dim: 512
+make_undirected: true
+add_self_loops: false

@@ -1,0 +1,17 @@
+name: dmgc
+
+# DMGC supervised adaptation (reference: OpenMAG DMGC.yaml). The InfoNCE
+# losses of the clustering objective are dropped; the architecture is kept.
+hidden_dim: 128
+num_layers: 1
+dropout: 0.5
+
+# OpenMAG defaults — kept for configuration fidelity even though they only
+# weigh the (dropped) contrastive losses.
+tau: 1.0
+lambda_cr: 0.001
+lambda_cm: 1.0
+
+# OpenMAG nc.yaml preset: lr 5e-3, wd 1e-5.
+lr: 5e-3
+weight_decay: 1e-5

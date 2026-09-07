@@ -1,0 +1,12 @@
+name: dgf
+
+# DGF filtering-core supervised adaptation (reference: OpenMAG DGF.yaml).
+hidden_dim: 64
+alpha: 1.0
+beta: 1.0
+num_layers: 10
+dropout: 0.0
+
+# Official preset (RPTA baseline_adaptations.md): lr 5e-3, wd 1e-5.
+lr: 5e-3
+weight_decay: 1e-5

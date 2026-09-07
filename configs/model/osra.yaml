@@ -1,0 +1,66 @@
+name: osra
+
+# =========================================================================
+# OSRA — Ownership-Specific Relational Access
+# (docs/OSRA_下一阶段推进计划.md)
+#
+#   Disentangle -> Preserve -> Access -> Integrate
+#
+# S1 (plan §5-§7): Strong Same-Ownership Local Parent. Variants:
+#   L0 = local_mode: r3_diag        (R3 diagonal control)
+#   L1 = local_mode: strong,  anchor_mix: 0.0
+#   L2 = local_mode: strong,  anchor_mix: 0.1
+#   L3 = local_mode: gatv2          (factor-wise GATv2 control)
+#
+# S2 (plan §9-§13, only after the S1 gate passes): Target-Driven
+# Cross-Ownership Relational Access. Variants (all share the S1-winning
+# local parent):
+#   Q0 = cross_access: false
+#   Q1 = access_mode: direct      Q2 = query_mode: static, use_null: false
+#   Q3 = query_mode: target, use_null: false   Q4 = Q3 + use_null: true
+# =========================================================================
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+# P0 auxiliary objective (unchanged from biaxis_final); S0-S2 keep no
+# ADDITIONAL aux objective (lambda_aux = 0, plan §2).
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+# Unified NC protocol.
+lr: 0.001
+weight_decay: 0.0001
+
+osra:
+  # --- Stage II block stack (plan §3: num_blocks: 2) ---
+  num_blocks: 2
+
+  # --- S1: strong local parent (plan §6) ---
+  local_mode: strong      # strong | gatv2 | r3_diag
+  ffn_expand_ratio: 2
+  layer_scale_init: 0.1   # 0.0 = frozen-zero (exact identity, test mode only)
+  anchor_mix: 0.0         # L2: 0.1 (initial ownership anchor)
+
+  # --- S2: cross-ownership relational access (plan §9-§13) ---
+  cross_access: false     # S1 runs with this OFF; Q0 == the S1 parent
+  access_mode: query      # direct (Q1) | query (Q2-Q4)
+  relation_dim: 128
+  num_slots: 2            # K relational slots per target factor
+  slot_dim: 16
+  query_mode: target      # static (Q2) | target (Q3/Q4)
+  use_null: true          # Q4 (learnable null key, null value fixed 0)
+  relational_scale_init: 0.05  # rho_l, must be > 0 (plan §13)
+
+  # --- memory / logging ---
+  memory_checkpoint: true
+  log_local_stats: true
+  log_access_stats: true
+  edge_chunk_size: 200000

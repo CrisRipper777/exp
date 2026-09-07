@@ -1,0 +1,47 @@
+name: biaxis_scope_v2
+
+# SCOPE-MAG v2 keeps the P0 factorizer and auxiliary objective unchanged.
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+full_graph_training: true
+lr: 0.001
+weight_decay: 0.0001
+
+scope:
+  # local = OSC; local_global = OSC + factor-separated FGR; none = pointwise
+  # P0 equivalence/control mode.
+  graph_mode: local
+  local_aggregation: mean
+  post_context_norm: false
+  context_core: osc
+  num_blocks: 2
+  edge_chunk_size: 200000
+  use_source_projection: false
+  beta_mode: adaptive
+  oacc_adapter_rank: 16
+  oacc_ffn_hidden_dim: 256
+  oacc_beta_hidden_dim: 64
+  oacc_rho: 0.1
+  oacc_gamma: 0.1
+  osc_hidden_dim: 256
+  factor_id_dim: 16
+  anchor_mix: 0.1
+  osc_scale_init: 0.1
+  orb_scale_init: 0.1
+  global_num_slots: 4
+  global_assignment_mode: learned
+  global_scale_init: 0.05
+  reconciliation:
+    # none = IND, orb = proposed ORB, full = unrestricted FULL control.
+    mode: none
+    rank: 32
+    hidden_dim: 128
+    use_graph_condition: true

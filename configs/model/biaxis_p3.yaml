@@ -1,0 +1,81 @@
+name: biaxis_p3
+
+# --- P0 semantic factorization (arch/obj unchanged, jointly optimized) ---
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+# Unified NC protocol.
+lr: 0.001
+weight_decay: 0.0001
+
+# --- P1 relation decomposition (frozen, M2) ---
+p1:
+  factor_aware: true
+  num_relations: 4
+  relation_dim: 32
+  relation_temperature: 0.5
+  selector_hidden_dim: 64
+  selector_input_norm: null
+  budget_hidden_dim: 64
+  use_graph_budget: true
+  budget_shared: false
+  eps: 1.0e-8
+  relation_balance_weight: 0.0
+  alpha_entropy_weight: 0.0
+  budget_reg_weight: 0.0
+  edge_chunk_size: 500000
+
+# --- P2 transport coupling: FROZEN on NullSoftmax (plan §2.3/§2.4) ---
+p2:
+  # P3 main experiments: null_softmax only (model hard-asserts this).
+  mode: null_softmax
+
+  score_hidden_dim: 64
+
+  epsilon: 0.2
+  tau_base: 1.0
+  sinkhorn_iters: 10
+
+  null_prior: 0.5
+  null_score_init: 0.0
+
+  # P3 never uses the deterministic verification mode (model hard-asserts
+  # false); fast default aggregation path only.
+  deterministic: false
+
+  detach_capacity_prior: true
+  detach_relation_confidence: true
+
+  eps: 1.0e-8
+
+# --- P3 factor-relation operator (plan §30) ---
+p3:
+  # shared | factor | relation | additive | full_interaction | basis | direct
+  #   O0   |   OF   |    OR    |   OADD   |       OFR        |       | (review-2 §10)
+  operator_mode: shared
+
+  # P3-B low-rank operator (implemented only after P3-A GO).
+  lowrank_rank: 16
+
+  # Basis-decomposed cell operator (review §20): T_fk = W0 + sum_b c_fkb V_b.
+  # B=4/8/16 forms the capacity curve O0 -> B4 -> OADD -> B8 -> OFR.
+  basis_num_bases: 8
+
+  # Residual regularizers: OFF in round 1 (plan §7; only global AdamW
+  # weight decay applies).
+  operator_reg_weight: 0.0
+  interaction_reg_weight: 0.0
+
+  # Memory fix (2026-09-04, user-authorized): activation checkpointing for
+  # the context+scorer segment. Numerics-preserving; see biaxis_final.yaml.
+  memory_checkpoint: true

@@ -1,0 +1,12 @@
+name: gcn
+
+# Official preset (RPTA baseline_adaptations.md): 256/3/0.2, ReLU+dropout
+# without norm layers, lr 5e-3, wd 1e-5.
+hidden_dim: 256
+num_layers: 3
+dropout: 0.2
+activation: relu
+norm: none
+
+lr: 5e-3
+weight_decay: 1e-5

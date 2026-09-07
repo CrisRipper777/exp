@@ -1,0 +1,23 @@
+name: Toys
+source: magb
+tasks: [nc, lp]
+
+graph_path: ${paths.data_root}/Toys/ToysGraph.pt
+text_feat_path: ${paths.data_root}/Toys/TextFeature/Toys_roberta_base_512_mean.npy
+image_feat_path: ${paths.data_root}/Toys/ImageFeature/Toys_openai_clip-vit-large-patch14.npy
+# Loaded data.x modality order is [x_t, x_i] to match MM-Graph *_feat.pt order.
+
+num_classes: 18
+feature_dtype: float32
+make_undirected: true
+add_self_loops: false
+
+nc_split_path: ${paths.split_root}/Toys_nc_seed${seed}_train0.6_val0.2.pt
+lp_split_path: ${paths.split_root}/Toys_lp_seed${seed}_val0.2_test0.2_neg150_filtered1.pt
+nc_train_ratio: 0.6
+nc_val_ratio: 0.2
+lp_val_ratio: 0.2
+lp_test_ratio: 0.2
+lp_num_neg: 150
+lp_split_undirected: true
+auto_generate_splits: true

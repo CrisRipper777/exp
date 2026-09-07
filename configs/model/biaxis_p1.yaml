@@ -1,0 +1,61 @@
+name: biaxis_p1
+
+# --- P0 semantic factorization, architecture/objective unchanged (plan §2:
+#     M1 must not change; NOT weight-frozen — params are jointly optimized,
+#     review §16) ---
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+# 2026-09-01 D1 screening: (0.1, 0.01, 0.1) collapsed the Common factor on
+# ele-fashion; (0.02, 0.01, 0.3) recovers effrank_c with unchanged accuracy.
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+
+# Below this batch size the cross-covariance orthogonality loss falls back to
+# squared-cosine overlap.
+orth_fallback_batch: 16
+
+# P1 graph modules need the complete topology: force full-graph training.
+full_graph_training: true
+
+# Unified NC protocol (keep frozen task values; P1-screen must not tune).
+lr: 0.001
+weight_decay: 0.0001
+
+# --- P1 graph-side modules (plan §21) ---
+p1:
+  # Variant switches (plan §15/§22). Factor OFF = the graph module does not
+  # see Common/Private identity (single fused state q), the P0 factorizer is
+  # still used unchanged.
+  factor_aware: true
+  num_relations: 4
+
+  relation_dim: 32
+  relation_temperature: 0.5
+
+  selector_hidden_dim: 64
+  # Revise-B diagnostic knob (default null): LayerNorm over the selector's
+  # concatenated input [f || g_k || f*g_k || a_k]. OFF unless explicitly
+  # enabled as a separate experiment.
+  selector_input_norm: null
+  budget_hidden_dim: 64
+  use_graph_budget: true
+  # budget_shared=true -> one budget value per node shared across C/Pt/Pv
+  # (budget ablation B1). Default = factor-specific budget (B2).
+  budget_shared: false
+
+  eps: 1.0e-8
+
+  # Diagnostic-only regularizers: OFF by default (plan §20). Any nonzero
+  # value must be enabled as a separate experiment, never silently merged.
+  relation_balance_weight: 0.0
+  alpha_entropy_weight: 0.0
+  budget_reg_weight: 0.0
+
+  # Engineering knob for large E: edge chunk size of the relation-weighted
+  # aggregation (peak transient memory ~ chunk_size x factor block dim).
+  edge_chunk_size: 500000

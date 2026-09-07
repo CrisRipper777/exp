@@ -1,0 +1,28 @@
+name: biaxis_r2_neighbor_utility
+
+# =========================================================================
+# Bi-Axis R2-Design-2.7 — pre-aggregation neighbor-utility model
+# (docs/BiAxis_R2_Design_2_7_PreAggregation_Neighbor_Utility_Audit.md)
+#
+#   s_ji^{a->b} = psi([F_i^b, F_j^a, F_i^b*F_j^a, |F_i^b-F_j^a|, e_a, e_b])
+#   alpha over {null} U N(i), tau=1.0 fixed
+#   m_i^{a->b} = sum_j alpha_ji^{a->b} U_a(F_j^a);  m_i^b = mean_a m_i^{a->b}
+#   z = [z_base | m_C | m_Pt | m_Pv]   (no projection to h)
+#
+# mode:
+#   a0_base / uniform / target_null_only / generic_edge / diag_edge /
+#   pair_edge / semantic_sim            (D2.7-A matrix)
+#   post_pair / source_factor_only / target_factor_only   (D2.7-C/D)
+#   pair_transform_uniform / pair_transform_pre           (D2.7-E)
+# =========================================================================
+
+mode: pair_edge
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+type_dim: 16
+edge_chunk_size: 50000

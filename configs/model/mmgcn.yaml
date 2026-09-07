@@ -1,0 +1,12 @@
+name: mmgcn
+
+# Official preset (RPTA baseline_adaptations.md): 128/2 layers/0.5 dropout,
+# lr 5e-3, wd 1e-5. Modality fusion stays official mean (text+image)/2.
+hidden_dim: 128
+num_layers: 2
+aggr: mean
+dropout: 0.5
+norm: batchnorm
+
+lr: 5e-3
+weight_decay: 1e-5

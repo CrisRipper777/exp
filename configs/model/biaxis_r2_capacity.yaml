@@ -1,0 +1,54 @@
+name: biaxis_r2_capacity
+
+# =========================================================================
+# Bi-Axis R2-Design-2.5 — structured-capacity model
+# (docs/BiAxis_R2_Design_2_5_Structured_Capacity_Utilization_Audit.md D2.5-C)
+#
+# One implementation, nine modes:
+#   early_mix    M1 control: Hmix = H1 + alpha_f (H2 - H1)      (B0 path)
+#   sep_sum      e1_f=T_f1(H1_f), e2_f=T_f2(H2_f), Fout=F+e1+beta_f*e2
+#   sep_concat   Fout_f = F_f + R_f([F_f | e1_f | e2_f])          (main candidate)
+#   inception_012 Fout_f = F_f + R_f([F_f | e0_f | e1_f | e2_f]), H0 = F
+#   cap_h1_dup   C2-identical structure on two H1 branches (capacity control)
+#   wide_b0      H1 only; wide transforms + wide fusion, param-matched to C2
+#   deep_fusion  B0 graph path unchanged; fusion -> residual 2-block MLP
+#   hop_attention  3 hop tokens -> 2 Pre-LN blocks per factor (D2.5-E)
+#   h1_attention   same architecture, 3 independent H1 tokens (E control)
+# =========================================================================
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+# P0 aux weights — copied verbatim from biaxis_final.yaml (audit §A2).
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+capacity_mode: sep_concat
+
+# neighbor_mean edge chunking (audited P1 aggregation).
+edge_chunk_size: 500000
+
+# D2.5-D training interventions (default OFF; single-factor only when used).
+deep_supervision:
+  enabled: false
+  lambda: 0.1
+
+path_dropout_p: 0.0
+
+semantic_refiner:
+  enabled: false
+  gate_hidden: 64
+  dropout: 0.2
+
+functional_transfer:
+  enabled: false
+  type_dim: 8
+  gate_hidden: 64
+  rho_func_init: 0.01

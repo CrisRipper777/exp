@@ -1,0 +1,15 @@
+name: lgmrec
+
+# LGMRec (RecSys 2024), ported from OpenMAG (OpenMAG/configs/model/lgmrec.yaml
+# + src/model/models.py). Hypergraph-enhanced LightGCN.
+# UNIFIED baseline protocol: plain CE only, NO OpenMAG InfoNCE aux
+# (user decision 2026-09-03); lr/wd preset from OpenMAG NC task config.
+hidden_dim: 128
+num_layers: 3
+dropout: 0.2
+hyper_num: 64
+alpha: 0.1
+
+# OpenMAG NC preset (official).
+lr: 5e-3
+weight_decay: 1e-5

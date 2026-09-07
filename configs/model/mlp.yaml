@@ -1,0 +1,12 @@
+name: mlp
+
+# Official preset (RPTA baseline_adaptations.md): 128/2 layers/0.5 dropout,
+# plain ReLU+dropout (no norm), lr 1e-3, wd 1e-4.
+hidden_dim: 128
+num_layers: 2
+dropout: 0.5
+activation: relu
+norm: none
+
+lr: 1e-3
+weight_decay: 1e-4

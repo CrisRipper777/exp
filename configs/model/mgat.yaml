@@ -1,0 +1,11 @@
+name: mgat
+
+# Official preset (RPTA baseline_adaptations.md): 128/1 layer/0.2 dropout,
+# lr 5e-3, wd 1e-5. Modality fusion stays official mean (text+image)/2.
+hidden_dim: 128
+num_layers: 1
+dropout: 0.2
+norm: batchnorm
+
+lr: 5e-3
+weight_decay: 1e-5

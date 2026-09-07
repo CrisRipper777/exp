@@ -1,0 +1,47 @@
+name: biaxis_r2
+
+# =========================================================================
+# Bi-Axis R2-Design-1 — R2-B0 CLEAN PARENT
+# (docs/BiAxis_R2_Design_1_Implementation_Validation_Plan.md §4)
+#
+#   P0 semantic ownership (unchanged factorizer + aux) + simple diagonal
+#   1-hop factor-wise propagation. NO semantic refiner, NO functional
+#   transfer. Purpose: does simple factor-wise propagation retain A0's
+#   main performance once the K-relation/Gamma/OFR machinery is removed?
+#
+# All four R2 variants share the SAME implementation (src/models/biaxis_r2.py)
+# and differ only in the two toggles below (plan §3/§36).
+# =========================================================================
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+# P0 aux weights — copied verbatim from biaxis_final.yaml (audit §A2).
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+# Unified NC protocol (A0 optimizer, plan §21).
+lr: 0.001
+weight_decay: 0.0001
+
+# neighbor_mean edge chunking (audited P1 aggregation; 500k > any E in the
+# NC suite, so the unchunked single-gather path is used in practice).
+edge_chunk_size: 500000
+
+semantic_refiner:
+  enabled: false
+  gate_hidden: 64
+  dropout: 0.2
+
+functional_transfer:
+  enabled: false
+  type_dim: 8
+  gate_hidden: 64
+  rho_func_init: 0.01

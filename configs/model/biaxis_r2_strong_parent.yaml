@@ -1,0 +1,34 @@
+name: biaxis_r2_strong_parent
+
+# =========================================================================
+# Bi-Axis R2-Design-2.6 — strong-parent readout integration
+# (docs/BiAxis_R2_Design_2_6_Strong_Parent_Readout_Integration.md)
+#
+#   z_base = A0(x, G)  (frozen strong parent; side branch only ADDS)
+#   H0 = F, H1 = P F, H2 = P^2 F  (side evidence from the A0 ownership factors)
+#   e_k^f = E_{f,k}(H_k^f)  (9 independent factor-hop experts)
+#   z = Readout(z_base, side)  (one of five non-collapsing readouts)
+#
+# readout_type:
+#   no_compression_concat      z = [z_base | 9 tokens]
+#   factor_hop_concat          z = [z_base | s_C | s_Pt | s_Pv]
+#   residual_side_fusion       z = z_base + R_side(ResidualFusion([s]))
+#   base_anchored_hier_attention  z = z_base + W_o(T_final[0] - z_base)
+#   readout_only_control       z = z_base + M(z_base)  (param-matched)
+#
+# token_source: hop = H0/H1/H2 (candidate); h1 = 3 independent H1
+# transforms (mandatory architecture-identical control).
+# =========================================================================
+
+readout_type: factor_hop_concat
+token_source: hop
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+deep_supervision:
+  enabled: true
+  lambda: 0.1

@@ -1,0 +1,75 @@
+name: biaxis_ablation
+
+# =========================================================================
+# Paper-facing ablation model (plan §21/§22). Formal ablations organized by
+# paper claims — NOT by development stages (P0/P1/P2/P3 never appear as
+# formal module names). Frozen structure otherwise identical to
+# biaxis_final.yaml.
+#
+#   ablation.mode:
+#     full_reference          == biaxis_final
+#     no_factor_axis          w/o Semantic Factor Axis (graph side F=1,
+#                             T_k = W0+B_k; semantic factorizer + aux
+#                             objective STILL train — only the graph side
+#                             loses factor identity, same as P1 F0R1)
+#     no_relation_axis        w/o Structural Relation Axis (K=1 strict
+#                             plain-neighbor context, T_f = W0+A_f)
+#     no_adaptive_allocation  w/o Adaptive Allocation (Gamma_if0=0,
+#                             Gamma_ifk = a_ik topology availability)
+#     shared_operator         w/o Hierarchical Operator (T_fk = W0)
+#     no_cell_correction      w/o Cell-specific Correction (T = W0+A_f+B_k)
+# =========================================================================
+
+ablation:
+  mode: full_reference
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+lr: 0.001
+weight_decay: 0.0001
+
+p1:
+  factor_aware: true
+  num_relations: 4
+  relation_dim: 32
+  relation_temperature: 0.5
+  selector_hidden_dim: 64
+  selector_input_norm: null
+  budget_hidden_dim: 64
+  use_graph_budget: true
+  budget_shared: false
+  eps: 1.0e-8
+  relation_balance_weight: 0.0
+  alpha_entropy_weight: 0.0
+  budget_reg_weight: 0.0
+  edge_chunk_size: 500000
+
+p2:
+  mode: null_softmax
+  score_hidden_dim: 64
+  epsilon: 0.2
+  tau_base: 1.0
+  sinkhorn_iters: 10
+  null_prior: 0.5
+  null_score_init: 0.0
+  deterministic: false
+  detach_capacity_prior: true
+  detach_relation_confidence: true
+  eps: 1.0e-8
+
+p3:
+  operator_mode: full_interaction
+  basis_num_bases: 8
+  operator_reg_weight: 0.0
+  interaction_reg_weight: 0.0

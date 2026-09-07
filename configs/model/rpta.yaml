@@ -1,0 +1,22 @@
+name: rpta
+
+# RPTA-MAG final (migrated from ../RPTA, rpta_final_nc_v1). Defaults below are
+# the Movies preset; the probe driver passes the per-dataset frozen presets
+# (hidden/factor/dropout/lr/wd/lambdas/gate priors) as model overrides.
+
+source_root: /hdd1/DataInHere/YHF/RPTA/src
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.6
+
+# Movies preset (rpta_final_nc_v1.yaml).
+lr: 0.00075
+weight_decay: 0.0001
+
+lambda_decomposition: 0.01
+lambda_common_node: 0.1
+lambda_prototype_balance: 0.1
+lambda_private_sharpness: 0.005
+lambda_factor_route_task: 0.3
+lambda_decoupled_route_task: 0.05

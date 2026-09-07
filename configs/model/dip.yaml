@@ -1,0 +1,28 @@
+name: dip
+
+# DiP encoder dimensions. d_model is the per-modality message feature size;
+# q_dim is the shared dynamic pathway state size.
+d_model: 256
+q_dim: 256
+n_q: 8
+mp_hops: 3
+
+# Modality-specific pseudo nodes.
+n_pnode_v: 512
+n_pnode_t: 64
+
+dropout: 0.1
+norm: true
+fusion_type: path_integral
+
+# DiP pseudo nodes are global mediators in the paper. Keep training on the
+# complete message graph by default instead of NeighborLoader subgraphs.
+full_graph_training: true
+
+# null keeps the encoder output as concat([visual_state, text_state]), i.e. 2*q_dim.
+# Set to an integer, e.g. 128, to add the official LP-style output projection.
+embedding_dim: null
+
+# Official preset (RPTA baseline_adaptations.md): lr 1e-3, wd 1e-5.
+lr: 1e-3
+weight_decay: 1e-5

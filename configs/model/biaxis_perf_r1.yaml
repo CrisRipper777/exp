@@ -1,0 +1,110 @@
+name: biaxis_perf_r1
+
+# =========================================================================
+# Bi-Axis MAG — Performance-R1 branch (plan §37 Prompt 3)
+#
+# Mirrors biaxis_final.yaml field-for-field (same-code-path discipline):
+# the frozen parent chain is P0 M1 + P1 M2 (K=4) + P2 NullSoftmax +
+# P3 full_interaction operator. The ONLY addition is the r1 section.
+#
+#   r1.mode = baseline             == biaxis_final (bitwise, same weights)
+#   r1.mode = semantic_reliability  R1-A1: factor-conditioned edge
+#                                   reliability eta_ji^f in the relation
+#                                   context aggregation only
+#
+# NEVER add experiment knobs outside the r1 section; the parent fields
+# must stay identical to biaxis_final.yaml.
+# =========================================================================
+
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+orth_fallback_batch: 16
+
+full_graph_training: true
+
+# Unified NC protocol.
+lr: 0.001
+weight_decay: 0.0001
+
+# --- P1 relation decomposition (frozen, M2) ---
+p1:
+  factor_aware: true
+  num_relations: 4
+  relation_dim: 32
+  relation_temperature: 0.5
+  selector_hidden_dim: 64
+  selector_input_norm: null
+  budget_hidden_dim: 64
+  use_graph_budget: true
+  budget_shared: false
+  eps: 1.0e-8
+  relation_balance_weight: 0.0
+  alpha_entropy_weight: 0.0
+  budget_reg_weight: 0.0
+  edge_chunk_size: 500000
+
+# --- P2 transport coupling: frozen NullSoftmax (R1 model hard-asserts) ---
+p2:
+  mode: null_softmax
+  score_hidden_dim: 64
+  epsilon: 0.2
+  tau_base: 1.0
+  sinkhorn_iters: 10
+  null_prior: 0.5
+  null_score_init: 0.0
+  deterministic: false
+  detach_capacity_prior: true
+  detach_relation_confidence: true
+  eps: 1.0e-8
+
+# --- P3 final operator: frozen OFR (R1 model hard-asserts) ---
+p3:
+  operator_mode: full_interaction
+  operator_reg_weight: 0.0
+  interaction_reg_weight: 0.0
+
+# --- R1-A reliability (the only new knobs) ---
+r1:
+  # baseline | semantic_reliability (A1, Hard NO-GO) |
+  # semantic_relation_calibration (A2) | detached_2hop (C1SG)
+  mode: baseline
+
+  # Factor-conditioned edge reliability (audit §7): P_f d->32 (bias=True),
+  # shared MLP 3*32+1 -> 64 -> 1, last layer zero-init => eta == 1 at step 0.
+  rel_proj_dim: 32
+  rel_hidden_dim: 64
+  # eta is computed and consumed per edge chunk (audit Q4); 200K keeps the
+  # token transient ~78 MB on ele-fashion (E=399K -> 2 chunks).
+  rel_chunk_size: 200000
+
+  # Review option B control (plan §10 round-1 regularizers, authorized):
+  #   null  = plain A1 (default, frozen behavior)
+  #   mean1 = mean_{e,f} (eta-1)^2            (pull eta back toward 1)
+  #   band  = hinge^2 outside (0.5, 1.5)      (permissive inside the band)
+  # reg_weight = 0 disables the regularizer entirely.
+  reg_type: null
+  reg_weight: 0.0
+
+  # --- R1-B Gamma refinement (plan §19, user-decoupled variants; parent =
+  #     A0 baseline) ---
+  # base | local_only (BL) | relation_only (BR) | evidence (BLR)
+  #   local_only:    s_if0 = z_f + MLP_0([f|g_bar||f-g_bar|f*g_bar])
+  #                  (alpha = Softmax_k(s_rel/eps) unchanged, user §7)
+  #   relation_only: s_ifk += MLP_R([log1p(m_ik)|a_ik])   (feature only)
+  #   evidence:      both
+  #   all zero-init => bitwise-equal to the parent Gamma at step 0.
+  router_mode: base
+  router_hidden_dim: 64
+
+  # --- R1-C1SG detached adaptive 2-hop (user ruling; parent = A0) ---
+  # Second hop: same graph block under no_grad (zero gradient to parent
+  # params); W_traj shared across factors; depth gate MLP zero-init =>
+  # lam == 0 => F_out == F1 exactly at step 0.
+  hop_hidden_dim: 64

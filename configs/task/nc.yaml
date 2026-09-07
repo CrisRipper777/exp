@@ -1,0 +1,47 @@
+name: nc
+
+# RPTA-style protocol (reference: RPTA docs/experiment_protocol.md):
+# full-graph training — one forward over the complete transductive graph per
+# epoch, CE on train nodes only, val-Accuracy checkpoint, test evaluated once
+# after the checkpoint is frozen.
+training_mode: full_graph # full_graph | sampled (sampled = fallback for huge graphs)
+optimizer: adamw # adamw | adam
+
+epochs: 300
+lr: 1e-3
+weight_decay: 1e-4
+# Models may override lr / weight_decay via their own config (official presets).
+patience: 30
+early_stop_min_epoch: 1
+grad_clip: null # RPTA uses no gradient clipping
+
+# Only used by training_mode=sampled:
+batch_size: 1024
+num_neighbors: 15
+
+inference_mode: full # 'full' or 'layerwise'
+inference_batch_size: 4096
+eval_every: 1
+max_train_batches: null
+# Optional: save best checkpoint (model+classifier) for offline P0 factor probes.
+# null = do not save (default behavior unchanged).
+save_ckpt_path: null
+
+loss:
+  aux_weight: 1.0
+
+# R1.5 val-only screen (plan §4): evaluate_test=false skips all test access
+# and test metrics (backward-compatible; default true keeps the formal
+# benchmark behavior unchanged).
+evaluate_test: true
+
+# R1.5 per-epoch training history (plan §9): null = off (default). Set to a
+# CSV path to record per-epoch train CE/aux split, train acc (full-graph
+# mode), val metrics, lr, patience and the P0 aux components.
+history_path: null
+
+# R1.5 LR schedule (plan §R15-4): null (default, constant LR) |
+# warmup_cosine (warmup scheduler_warmup_epochs -> cosine to min).
+scheduler: null
+scheduler_warmup_epochs: 10
+scheduler_min_lr: 1.0e-5

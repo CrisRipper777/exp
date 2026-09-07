@@ -1,0 +1,23 @@
+defaults:
+  - dataset: Movies
+  - task: nc
+  - model: mlp
+  - _self_
+
+seed: 42
+num_runs: 3
+device: cuda:0
+
+paths:
+  data_root: /hdd1/DataInHere/YHF/data
+  split_root: /hdd1/DataInHere/YHF/data/MAGB_split
+  output_root: outputs
+
+logging:
+  level: INFO
+
+hydra:
+  job:
+    chdir: false
+  run:
+    dir: ${paths.output_root}/${now:%Y-%m-%d}/${now:%H-%M-%S}
