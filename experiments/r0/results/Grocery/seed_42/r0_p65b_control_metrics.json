@@ -1,0 +1,136 @@
+{
+  "meta": {
+    "dataset": "Grocery"
+  },
+  "n_pairs": 2535,
+  "eps_s": 4.2189145460724836e-06,
+  "pairing": {
+    "median_log_alpha_ratio_abs": 0.37816301858694445,
+    "q90_log_alpha_ratio_abs": 1.2211735349719113,
+    "median_log_normV_ratio_abs": 0.4494351254545039,
+    "q90_log_normV_ratio_abs": 1.2847356331954887
+  },
+  "interaction_magnitude": {
+    "absS_exact_real": {
+      "mean": 0.011271114338792444,
+      "median": 0.0005521047860383987,
+      "_q": {
+        "q10": 4.2189145460724836e-06,
+        "q25": 4.721013829112053e-05,
+        "q50": 0.0005521047860383987,
+        "q75": 0.004492402076721191,
+        "q90": 0.021425870060920706
+      }
+    },
+    "absS_exact_shuffle": {
+      "mean": 0.007976764528423367,
+      "median": 0.0006052926182746887,
+      "_q": {
+        "q10": 4.581920802593231e-06,
+        "q25": 5.112934741191566e-05,
+        "q50": 0.0006052926182746887,
+        "q75": 0.0046072835102677345,
+        "q90": 0.018086767196655258
+      }
+    },
+    "wilcoxon_p_absS": 0.34301246693599285,
+    "absS_norm_real": {
+      "mean": 0.04378300280029521,
+      "median": 0.021828679367899895
+    },
+    "absS_norm_shuffle": {
+      "mean": 0.04201033238216957,
+      "median": 0.02156936377286911
+    },
+    "P_absS_norm_gt0.1_real": 0.11676528599605522,
+    "P_absS_norm_gt0.1_shuffle": 0.10374753451676529,
+    "absS_second_real": {
+      "mean": 0.013245331566436423,
+      "median": 0.0006929689127794011
+    },
+    "absS_second_shuffle": {
+      "mean": 0.009476208645242021,
+      "median": 0.0006975125651864045
+    },
+    "wilcoxon_p_absS_second": 0.5390612580857297
+  },
+  "far_tail": {
+    "gt_0.01": {
+      "P_real": 0.16646942800788955,
+      "P_shuffle": 0.15779092702169625,
+      "real_only": 147,
+      "shuffle_only": 125,
+      "mcnemar_p": 0.2028218171523803
+    },
+    "gt_0.02": {
+      "P_real": 0.10690335305719921,
+      "P_shuffle": 0.09546351084812624,
+      "real_only": 125,
+      "shuffle_only": 96,
+      "mcnemar_p": 0.05938929530167107
+    },
+    "gt_0.05": {
+      "P_real": 0.04694280078895464,
+      "P_shuffle": 0.03629191321499014,
+      "real_only": 79,
+      "shuffle_only": 52,
+      "mcnemar_p": 0.02274326812824497
+    },
+    "gt_0.1": {
+      "P_real": 0.020118343195266272,
+      "P_shuffle": 0.0126232741617357,
+      "real_only": 40,
+      "shuffle_only": 21,
+      "mcnemar_p": 0.020414713799634897
+    },
+    "_top10pct_rows": {
+      "n": 254,
+      "absS_exact_real_mean": 0.0879124185679055,
+      "absS_exact_shuffle_mean": 0.05584902621578337
+    },
+    "matched_corr_absS_real_shuffle": 0.376382742897132
+  },
+  "sign_systematics": {
+    "real": {
+      "P_S_gt_0": 0.4642998027613412,
+      "P_S_lt_0": 0.5309664694280078,
+      "mean_S": 0.004344956060122062,
+      "sign_acc_S2_vs_S_gt_eps": 0.9811486190267427,
+      "n_gt_eps": 2281,
+      "spearman_S_S2": 0.9655075223268308
+    },
+    "shuffle": {
+      "P_S_gt_0": 0.4990138067061144,
+      "P_S_lt_0": 0.4938856015779093,
+      "mean_S": 0.0030438955207378045,
+      "sign_acc_S2_vs_S_gt_eps": 0.9785932721712538,
+      "n_gt_eps": 2289,
+      "spearman_S_S2": 0.9680559204855931
+    }
+  },
+  "task_effect": {
+    "Q_best_real": {
+      "mean": 0.07530832435674446,
+      "median": 0.007526561617851257
+    },
+    "Q_best_shuffle": {
+      "mean": 0.07556336410990805,
+      "median": 0.007490849122405052
+    },
+    "wilcoxon_p": 0.977762079659034,
+    "P_Qbest_real_gt_shuffle": 0.47810650887573963,
+    "P_Qbest_real_gt_shuffle_ties": 0.5266272189349113
+  },
+  "better_matched_half": {
+    "n": 1268,
+    "absS_exact_real_mean": 0.007286803316962626,
+    "absS_exact_shuffle_mean": 0.007503567100504864,
+    "wilcoxon_p_absS": 0.7757029003703776,
+    "absS_second_real_mean": 0.008748432119080808,
+    "absS_second_shuffle_mean": 0.009151279508067354,
+    "wilcoxon_p_absS_second": 0.3532882553526624,
+    "Q_best_real_mean": 0.06691788256580358,
+    "Q_best_shuffle_mean": 0.06678066350504705,
+    "wilcoxon_p_Qbest": 0.8451208574715923
+  }
+}
