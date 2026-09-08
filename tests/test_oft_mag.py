@@ -12,6 +12,14 @@ Covers (O1 plan §10):
 8. eval forward vs inference equivalence;
 9. no [E,3,3,...] giant edge-pair tensor (profiler shape audit).
 
+O1.5 (causal cleanup) adds the strict matched no-topology control
+``variant=diag_nograph`` (O1.5-A):
+10. unknown variant / num_layers != 1 validation;
+11. diag_nograph param count == diag_id and identical init values;
+12. diag_nograph graph delta exactly 0 (routed path N=0 -> D(0)=0);
+13. changing edge_index never changes diag_nograph outputs (bitwise);
+14. diag_nograph output == LayerNorm(H0) then the original fusion.
+
 Style: synthetic tensors only, no data fixtures (matches tests/ conventions).
 """
 
@@ -419,3 +427,120 @@ def test_no_giant_edge_pair_tensor():
             if len(shape) >= 3 and shape[0] == n_edges and shape[1] == S and shape[2] == S:
                 offenders.append((evt.key, shape))
     assert not offenders, f"giant [E,S,S,...] tensor ops: {offenders[:5]}"
+
+
+# ----------------------------------------------------------------------
+# 10-14. O1.5: diag_nograph matched no-topology control
+# ----------------------------------------------------------------------
+
+
+def test_variant_must_be_known():
+    x, data_info = _make_data()
+    with pytest.raises(ValueError, match="variant"):
+        Model(_make_cfg(variant="diag_banana"), data_info)
+    # diag_nograph is the same single-layer scaffold as diag_id
+    with pytest.raises(ValueError, match="num_layers=1"):
+        Model(_make_cfg(variant="diag_nograph", num_layers=2), data_info)
+    # variant defaults to diag_id when absent (backward compatible)
+    m, _ = _make_model()
+    assert m.variant == "diag_id"
+
+
+def test_diag_nograph_parameters_match_diag_id_exactly():
+    """O1.5 matched control: identical parameter count AND identical
+    initialization (same RNG stream -> same values, state dict key-identical),
+    so diag_nograph differs from diag_id only in the graph response."""
+    x, data_info = _make_data()
+    cfg_id = _make_cfg(variant="diag_id")
+    cfg_no = _make_cfg(variant="diag_nograph")
+    torch.manual_seed(123)
+    m_id = Model(cfg_id, data_info)
+    torch.manual_seed(123)
+    m_no = Model(cfg_no, data_info)
+
+    sd_id, sd_no = m_id.state_dict(), m_no.state_dict()
+    assert set(sd_id) == set(sd_no)
+    numel = 0
+    for key in sd_id:
+        assert sd_id[key].shape == sd_no[key].shape, key
+        assert torch.equal(sd_id[key], sd_no[key]), f"{key} init differs"
+        numel += sd_id[key].numel()
+    n_id = sum(p.numel() for p in m_id.parameters())
+    n_no = sum(p.numel() for p in m_no.parameters())
+    assert n_id == n_no == numel
+    # every graph-block map stays instantiated in the control
+    layer = m_no.diag_layers[0]
+    assert len(layer.V) == 3 and len(layer.D) == 3 and len(layer.norm) == 3
+
+
+def test_diag_nograph_graph_delta_exactly_zero():
+    """The path diag_nograph actually executes (edge input routed to None):
+    N == 0 exactly, delta = D(0) == 0 exactly (D bias=False), stats exactly
+    0, and H_next == per-slot LayerNorm(H0)."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="diag_nograph")
+    layer = model.diag_layers[0]
+    with torch.no_grad():
+        x_t, x_v = model._split_modalities(x)
+        factors = model.factorizer(x_t, x_v)
+        H0 = stack_factor_slots(factors)
+        H1, stats = layer.propagate(H0, None)
+    assert torch.equal(stats["diag_update_ratio"], torch.zeros(3))
+    assert torch.equal(stats["neighbor_norm"], torch.zeros(3))
+    for a in range(3):
+        assert torch.equal(
+            H1[:, a], layer.norm[a](H0[:, a] + torch.zeros_like(H0[:, a]))
+        )
+
+    # training forward on a real graph: P0 aux losses intact, oft stats zero
+    model.train()
+    edge_index = _random_graph(x.size(0), 24, seed=1)
+    z, _, _, aux_loss, aux_info = model(x, edge_index)
+    assert z.shape == (x.size(0), model.out_dim)
+    assert float(aux_loss) > 0.0
+    assert "p0_cp_overlap_t" in aux_info  # P0 diagnostics still emitted
+    for key in (
+        "oft_l1_c_diag_update_ratio", "oft_l1_pt_diag_update_ratio",
+        "oft_l1_pv_diag_update_ratio",
+        "oft_l1_c_neighbor_norm", "oft_l1_pt_neighbor_norm",
+        "oft_l1_pv_neighbor_norm",
+    ):
+        assert float(aux_info[key]) == 0.0, key
+
+
+def test_diag_nograph_edge_index_invariance():
+    """Changing edge_index must not change diag_nograph's H_next (hence z):
+    any non-empty edge set and None give bitwise identical outputs."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="diag_nograph")
+    model.eval()
+    e1 = _random_graph(x.size(0), 24, seed=1)
+    e2 = _random_graph(x.size(0), 40, seed=2)
+    with torch.no_grad():
+        z1, _, _, _, _ = model(x, e1)
+        z2, _, _, _, _ = model(x, e2)
+        z0, _, _, _, _ = model(x, None)
+    assert torch.equal(z1, z2)
+    assert torch.equal(z1, z0)
+
+
+def test_diag_nograph_output_equals_layernorm_then_fusion():
+    """diag_nograph(x, edge_index) must equal LayerNorm(H0) per slot followed
+    by the original P0 fusion — the exact no-topology scaffold semantics."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="diag_nograph")
+    layer = model.diag_layers[0]
+    edge_index = _random_graph(x.size(0), 24, seed=5)
+    model.eval()
+    with torch.no_grad():
+        x_t, x_v = model._split_modalities(x)
+        factors = model.factorizer(x_t, x_v)
+        H0 = stack_factor_slots(factors)
+        H1_manual = torch.stack(
+            [layer.norm[a](H0[:, a]) for a in range(3)], dim=1
+        )
+        z_manual = model.fusion(
+            torch.cat([H1_manual[:, a] for a in range(3)], dim=-1)
+        )
+        z, _, _, _, _ = model(x, edge_index)
+    assert torch.equal(z, z_manual)

@@ -9,9 +9,13 @@ dropout: 0.2
 activation: gelu
 norm: layernorm
 
+# O1 = diag_id (real graph propagation). O1.5 causal cleanup adds
+# diag_nograph: strict matched no-topology control — identical params/init/
+# fusion/losses, only the graph neighbor response is forced to zero
+# (edge_index routed away -> N=0 -> delta = D(0) = 0 exactly -> H1 = LN(H0)).
 variant: diag_id
-# O1 is a single-layer scaffold by design (no multi-scale). The model module
-# raises unless num_layers == 1.
+# O1 / O1.5 are single-layer scaffolds by design (no multi-scale). The model
+# module raises unless num_layers == 1.
 num_layers: 1
 
 # In-model aux loss weights (same P0 recipe as biaxis_p0.yaml).

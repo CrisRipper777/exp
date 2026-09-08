@@ -10,6 +10,13 @@ from .oft_components import DiagIDLayer, NUM_SLOTS, SLOT_NAMES
 # Slot <-> factorizer key map. Permanently fixed: 0=C, 1=Pt, 2=Pv.
 _FACTOR_KEYS = ("c", "p_t", "p_v")
 
+# O1 / O1.5 variants (config ``model.variant``):
+#   diag_id      — O1 OFT-DIAG-ID: real graph propagation through V/D/LN.
+#   diag_nograph — O1.5 strict matched no-topology control: the graph input
+#                  is routed away so the neighbor response is exactly zero
+#                  (see Model docstring). Same params / init / fusion / losses.
+VARIANTS = ("diag_id", "diag_nograph")
+
 
 def stack_factor_slots(factors: dict[str, Tensor]) -> Tensor:
     """H = stack([C, Pt, Pv], dim=1) -> [N, 3, F]. Slot order is fixed."""
@@ -27,6 +34,16 @@ class Model(P0Model):
     self-loops, no multi-scale and exactly ``num_layers=1``; the final
     representation is the P0 fusion over the post-propagation H1 slots.
 
+    O1.5 ``diag_nograph`` (variant switch): strict matched no-topology control
+    for the O1.5 graph-causality cleanup. It is diag_id with every parameter,
+    structure, initialization, fusion and P0 loss unchanged, and the single
+    allowed difference that the graph neighbor response is forced to zero:
+    the propagation is fed ``edge_index=None``, so ``incoming_mean`` returns
+    exact zeros, ``delta_a = D_a(0) = 0`` exactly (D_a has bias=False) and
+    ``H_next_a = LayerNorm(H_a + 0)``. V_a / D_a / LN stay instantiated and in
+    the optimizer parameter set (their weights never move because the graph
+    channel is dead) — parameter count is exactly diag_id's.
+
     Framework interface (unchanged from P0):
         forward(x, edge_index) -> (z, None, None, aux_loss, aux_info)
         inference(x, edge_index, device, batch_size) -> z (CPU)
@@ -38,10 +55,16 @@ class Model(P0Model):
 
     def __init__(self, cfg, data_info):
         super().__init__(cfg, data_info)
+        variant = str(cfg.model.get("variant", "diag_id")).strip().lower()
+        if variant not in VARIANTS:
+            raise ValueError(
+                f"OFT model.variant must be one of {VARIANTS}, got {variant!r}"
+            )
+        self.variant = variant
         num_layers = int(cfg.model.get("num_layers", 1))
         if num_layers != 1:
             raise ValueError(
-                f"O1 OFT-DIAG-ID supports num_layers=1 only, got {num_layers} "
+                f"OFT variants {VARIANTS} support num_layers=1 only, got {num_layers} "
                 "(single-layer scaffold; no multi-scale)"
             )
         self.num_layers = num_layers
@@ -61,14 +84,20 @@ class Model(P0Model):
 
         Returns (factors, z, layer_stats). With an empty graph the stats are
         exactly zero (no messages -> delta = 0), which keeps the training
-        diagnostics well-defined in every case."""
+        diagnostics well-defined in every case.
+
+        O1.5 ``diag_nograph``: the graph input is routed away here (single
+        choke point, shared by forward/inference), so the layer executes its
+        empty-graph path: N = 0, delta = D(0) = 0 exactly, H1 = LN(H0).
+        ``diag_id`` keeps the identical pre-O1.5 code path."""
         x_t, x_v = self._split_modalities(x)
         factors = self.factorizer(x_t, x_v)
         H0 = stack_factor_slots(factors)  # [N, 3, F]
+        prop_edge = edge_index if self.variant == "diag_id" else None
         H = H0
         stats: dict[str, torch.Tensor] = {}
         for layer in self.diag_layers:
-            H, stats = layer.propagate(H, edge_index)
+            H, stats = layer.propagate(H, prop_edge)
         H1 = H
         z = self.fusion(torch.cat([H1[:, a] for a in range(NUM_SLOTS)], dim=-1))
         return factors, z, stats
