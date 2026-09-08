@@ -57,8 +57,8 @@ CONDITIONAL-CROSS 的 F1 优势仍有 **+1.28pp**、BalAcc **+0.32pp**（Acc −
 | 项 | 值 |
 |---|---|
 | starting HEAD | `12334481a20f1ab8b53008be95f24cd2734eb35a`（O2-A 文档补记 commit；其父为 O2-A 代码 commit `09c039f26c3dbbbe8985d48025035299f3862643`，tag `oft-o2a-static-cross`） |
-| O2-B1 commit | 见 §34（本报告与代码同一 commit） |
-| O2-B1 tag | `oft-o2b1-conditional-routing` |
+| O2-B1 commit | `36fec95780638814778ffccdea59417fa8a2f32e` |
+| O2-B1 tag | **`oft-o2b1-conditional-routing`** → `36fec95`（已 `git push origin oft-mag --tags`） |
 
 O2-B1 建立在 `oft-o2a-static-cross` 已完成的代码之上：`StaticCrossLayer`、
 `CROSS_PAIR_KEYS`、`post_transition_stats`、`oft_o1_5_val_per_class.py` 的
@@ -584,7 +584,12 @@ git push origin oft-mag --tags
 | 项 | 值 |
 |---|---|
 | starting HEAD | `12334481a20f1ab8b53008be95f24cd2734eb35a` |
-| O2-B1 commit | `de1417e`（见下方补记） |
-| tag | `oft-o2b1-conditional-routing` |
+| O2-B1 commit | `36fec95780638814778ffccdea59417fa8a2f32e` |
+| tag | `oft-o2b1-conditional-routing` → `36fec95` |
+| push | `1233448..36fec95  oft-mag -> oft-mag`；tag 已推送 |
+| 本次补记 commit | 仅把上述 SHA 写入本报告（文档改动，无代码/实验变化） |
+
+测试复核（commit 前最后一遍）：`pytest tests/test_oft_mag.py -q` → **52 passed**；
+`pytest tests/ -q` → **108 passed**。
 
 checkpoint `.pt`、运行日志、hydra 目录在 `outputs/`（gitignored），不入库。
