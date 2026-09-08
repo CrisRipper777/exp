@@ -51,8 +51,9 @@ control 来读 —— 这正是 O2-A 存在的理由。
 | 项 | 值 |
 |---|---|
 | starting HEAD | `67bb0ab9f46924bf517428101fc159becb3c26d9`（tag **`oft-o1-5`**，branch `oft-mag`；与计划给定 commit 一致） |
-| O2-A tag（本阶段加） | `oft-o2a-static-cross`（指向本报告 commit） |
-| ending HEAD | 见 §21 |
+| O2-A commit | `09c039f26c3dbbbe8985d48025035299f3862643` |
+| O2-A tag | **`oft-o2a-static-cross`** → `09c039f`（已 `git push origin oft-mag --tags`） |
+| ending HEAD | `09c039f` + 本报告补记 SHA 的文档 commit（见 §21） |
 
 新增：
 
@@ -499,6 +500,9 @@ git push origin oft-mag --tags
 | 项 | 值 |
 |---|---|
 | starting HEAD | `67bb0ab9f46924bf517428101fc159becb3c26d9`（tag `oft-o1-5`） |
-| ending HEAD | 见提交后记录（tag `oft-o2a-static-cross`） |
+| O2-A commit | `09c039f26c3dbbbe8985d48025035299f3862643` |
+| O2-A tag | `oft-o2a-static-cross` → `09c039f` |
+| push | `67bb0ab..09c039f  oft-mag -> oft-mag`；tags 已推送 |
+| 本次补记 commit | 仅把上述 SHA 写入本报告（文档改动，无代码/实验变化） |
 
 checkpoint `.pt`、运行日志、hydra 目录在 `outputs/`（gitignored），不入库。
