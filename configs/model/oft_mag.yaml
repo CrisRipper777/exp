@@ -1,0 +1,27 @@
+name: oft_mag
+
+# OFT-MAG O1 scaffold: OFT-DIAG-ID (functional operator = Identity).
+# P0 factorizer + fusion reuse: hidden_dim/factor_dim/loss weights identical
+# to biaxis_p0.yaml (0.02/0.01/0.3).
+hidden_dim: 256
+factor_dim: 128
+dropout: 0.2
+activation: gelu
+norm: layernorm
+
+variant: diag_id
+# O1 is a single-layer scaffold by design (no multi-scale). The model module
+# raises unless num_layers == 1.
+num_layers: 1
+
+# In-model aux loss weights (same P0 recipe as biaxis_p0.yaml).
+lambda_common: 0.02
+lambda_orth: 0.01
+lambda_recon: 0.3
+
+# Below this batch size the cross-covariance orthogonality loss falls back to
+# squared-cosine overlap.
+orth_fallback_batch: 16
+
+# O1 DIAG-ID needs the full graph for its propagation; never sample.
+full_graph_training: true

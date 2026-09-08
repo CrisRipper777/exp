@@ -69,7 +69,9 @@ def _aux_iteration_keys(mapping: dict | None) -> tuple[str, ...]:
         return AUX_INFO_KEYS
     extra = sorted(
         k for k in mapping
-        if isinstance(k, str) and (k.startswith("r3_") or k.startswith("scope_") or k.startswith("osra_"))
+        if isinstance(k, str)
+        and (k.startswith("r3_") or k.startswith("scope_") or k.startswith("osra_")
+             or k.startswith("oft_"))
     )
     return AUX_INFO_KEYS + tuple(extra)
 
