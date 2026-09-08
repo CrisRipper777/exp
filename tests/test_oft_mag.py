@@ -20,12 +20,21 @@ O1.5 (causal cleanup) adds the strict matched no-topology control
 13. changing edge_index never changes diag_nograph outputs (bitwise);
 14. diag_nograph output == LayerNorm(H0) then the original fusion.
 
+O2-A (static cross-ownership utility) adds the capacity-matched pair
+``static_cross`` / ``static_cross_dup`` (15-26) and O2-B1 (target-conditioned
+Null-vs-Transfer routing) adds ``conditional_cross`` / ``conditional_cross_dup``
+(27-46): shared-router structure, target-only router input (no source-content
+leak), zero-init p = 0.5, init-state equivalence to DIAG-ID, payload causality,
+the two-step router-gradient cascade, effective <= raw magnitudes, degenerate
+graph behaviour and the aux_info key surface.
+
 Style: synthetic tensors only, no data fixtures (matches tests/ conventions).
 """
 
 from __future__ import annotations
 
 import torch
+import torch.nn as nn
 import pytest
 from omegaconf import OmegaConf
 
@@ -33,9 +42,11 @@ from src.models import oft_mag
 from src.models.oft_components import (
     CROSS_PAIR_KEYS,
     CROSS_PAIR_TARGET_SLOT,
+    ConditionalCrossLayer,
     DiagIDLayer,
     SLOT_NAMES,
     StaticCrossLayer,
+    binary_entropy,
     incoming_mean,
     post_transition_stats,
 )
@@ -869,3 +880,490 @@ def test_encode_states_matches_forward_h1():
     assert float(post["post_cos_c_pt"]) == pytest.approx(
         float(post_transition_stats(H0, H1_manual)["post_cos_c_pt"]), abs=1e-6
     )
+
+
+# ----------------------------------------------------------------------
+# 27-46. O2-B1: target-conditioned Null-vs-Transfer routing
+# ----------------------------------------------------------------------
+
+
+def _randomize_router(layer: ConditionalCrossLayer, seed: int = 0, scale: float = 0.1) -> None:
+    """Break the zero-init router head so routing becomes input-dependent."""
+    g = torch.Generator().manual_seed(seed)
+    with torch.no_grad():
+        for param in layer.router.parameters():
+            param.copy_(torch.randn(param.shape, generator=g) * scale)
+        layer.factor_embed.weight.copy_(
+            torch.randn(layer.factor_embed.weight.shape, generator=g) * scale
+        )
+
+
+def _make_conditional(variant: str, seed: int = 0, **cfg_over):
+    torch.manual_seed(seed)
+    return _make_model(variant=variant, **cfg_over)
+
+
+def test_conditional_variants_parameter_counts_match():
+    """CONDITIONAL-CROSS and its capacity-matched control must have identical
+    parameter counts: diag_id + 6*F^2 (O2-A maps) + router (embedding + 2 linears)."""
+    x, data_info = _make_data()
+    fd, ed = 8, 16
+    models = {}
+    for variant in ("diag_id", "conditional_cross_dup", "conditional_cross"):
+        torch.manual_seed(11)
+        models[variant] = Model(_make_cfg(variant=variant, factor_dim=fd), data_info)
+
+    n_id = sum(p.numel() for p in models["diag_id"].parameters())
+    n_dup = sum(p.numel() for p in models["conditional_cross_dup"].parameters())
+    n_cross = sum(p.numel() for p in models["conditional_cross"].parameters())
+    router_params = (
+        3 * ed + (2 * fd + 2 * ed) * 128 + 128 + 128 * 2 + 2
+    )
+    assert n_dup == n_cross
+    assert n_cross - n_id == 6 * fd * fd + router_params
+
+
+def test_conditional_variants_state_dict_identical_init():
+    """Same RNG stream -> identical state dicts: the ONLY difference between the
+    two O2-B1 variants is which slot the routed payload reads."""
+    x, data_info = _make_data()
+    torch.manual_seed(123)
+    m_dup = Model(_make_cfg(variant="conditional_cross_dup"), data_info)
+    torch.manual_seed(123)
+    m_cross = Model(_make_cfg(variant="conditional_cross"), data_info)
+
+    sd_dup, sd_cross = m_dup.state_dict(), m_cross.state_dict()
+    assert set(sd_dup) == set(sd_cross)
+    for key in sd_dup:
+        assert sd_dup[key].shape == sd_cross[key].shape, key
+        assert torch.equal(sd_dup[key], sd_cross[key]), f"{key} init differs"
+    assert m_dup.diag_layers[0].dup is True
+    assert m_cross.diag_layers[0].dup is False
+
+
+def test_conditional_router_is_shared_single_module():
+    """ONE shared router (Linear->GELU->Linear) plus ONE factor embedding table
+    for all six pairs; pair identity comes from e_a/e_b, not from six MLPs."""
+    layer = ConditionalCrossLayer(factor_dim=8)
+    assert isinstance(layer.router, nn.Sequential)
+    assert len(layer.router) == 3
+    assert isinstance(layer.router[0], nn.Linear) and isinstance(layer.router[2], nn.Linear)
+    assert layer.router[0].in_features == layer.router_input_dim == 2 * 8 + 2 * 16
+    assert layer.router[0].out_features == 128 and layer.router[2].out_features == 2
+    assert layer.factor_embed.weight.shape == (3, 16)
+    # exactly V(3) + D(3) + cross(6) + router(2) linear layers; no per-pair router
+    linears = [name for name, mod in layer.named_modules() if isinstance(mod, nn.Linear)]
+    assert len(linears) == 3 + 3 + 6 + 2
+    assert sum(1 for name in linears if name.startswith("router")) == 2
+    for key in CROSS_PAIR_KEYS:
+        assert not any(isinstance(m, nn.Linear) for m in layer.cross[key].children())
+
+
+def test_router_reads_target_context_only():
+    """CONTROL DISCIPLINE: perturbing a SOURCE slot (H^a / N^a, a != b) must not
+    change that pair's router logits bitwise — otherwise CONDITIONAL-DUP could
+    still see source ownership content and the matched control is contaminated."""
+    layer = ConditionalCrossLayer(factor_dim=8)
+    _randomize_router(layer, seed=5)
+    H = torch.randn(11, 3, 8, generator=torch.Generator().manual_seed(6))
+    N = torch.randn(11, 3, 8, generator=torch.Generator().manual_seed(7))
+
+    for key in CROSS_PAIR_KEYS:
+        a_name, b_name = key.split("_to_")
+        a, b = SLOT_NAMES.index(a_name), SLOT_NAMES.index(b_name)
+        base = layer.pair_logits(H, N, a, b)
+
+        H_src = H.clone()
+        H_src[:, a] = H_src[:, a] + 3.0
+        N_src = N.clone()
+        N_src[:, a] = N_src[:, a] + 3.0
+        assert torch.equal(layer.pair_logits(H_src, N, a, b), base), key
+        assert torch.equal(layer.pair_logits(H, N_src, a, b), base), key
+
+        # sanity: the test is not vacuous — the TARGET context does move logits
+        H_tgt = H.clone()
+        H_tgt[:, b] = H_tgt[:, b] + 3.0
+        assert not torch.equal(layer.pair_logits(H_tgt, N, a, b), base), key
+
+
+def test_router_probabilities_are_valid_distribution():
+    """p is a proper 2-way softmax: shapes [N], in [0, 1], p_null + p_transfer = 1."""
+    layer = ConditionalCrossLayer(factor_dim=8)
+    _randomize_router(layer, seed=9)
+    H = torch.randn(13, 3, 8, generator=torch.Generator().manual_seed(10))
+    N = torch.randn(13, 3, 8, generator=torch.Generator().manual_seed(11))
+    transfer = layer.router_transfer(H, N)
+    assert set(transfer) == set(CROSS_PAIR_KEYS)
+
+    for key in CROSS_PAIR_KEYS:
+        a_name, b_name = key.split("_to_")
+        a, b = SLOT_NAMES.index(a_name), SLOT_NAMES.index(b_name)
+        probs = torch.softmax(layer.pair_logits(H, N, a, b), dim=-1)
+        assert probs.shape == (13, 2)
+        assert torch.allclose(probs.sum(dim=-1), torch.ones(13), atol=1e-6)
+        assert torch.equal(transfer[key], probs[:, 1])
+        assert bool((transfer[key] >= 0).all() and (transfer[key] <= 1).all())
+        ent = binary_entropy(transfer[key])
+        assert bool((ent >= 0).all() and (ent <= float(torch.log(torch.tensor(2.0))) + 1e-6).all())
+
+
+def test_router_zero_init_gives_half_transfer():
+    """Zero-initialized router head (weight and bias): step 0 logits are exactly
+    0 and p_null = p_transfer = 0.5 for every node and pair."""
+    layer = ConditionalCrossLayer(factor_dim=8)
+    assert torch.count_nonzero(layer.router[2].weight) == 0
+    assert torch.count_nonzero(layer.router[2].bias) == 0
+    H = torch.randn(9, 3, 8, generator=torch.Generator().manual_seed(12))
+    N = torch.randn(9, 3, 8, generator=torch.Generator().manual_seed(13))
+    for key in CROSS_PAIR_KEYS:
+        a_name, b_name = key.split("_to_")
+        a, b = SLOT_NAMES.index(a_name), SLOT_NAMES.index(b_name)
+        assert torch.equal(layer.pair_logits(H, N, a, b), torch.zeros(9, 2))
+        assert torch.equal(layer.router_transfer(H, N)[key], torch.full((9,), 0.5))
+
+
+def test_conditional_transfer_matrices_zero_initialized():
+    """The six O2-A transfer maps keep their strict zero init in O2-B1."""
+    for dup in (False, True):
+        layer = ConditionalCrossLayer(factor_dim=8, dup=dup)
+        for key in CROSS_PAIR_KEYS:
+            assert torch.count_nonzero(layer.cross[key].weight) == 0, key
+        H = torch.randn(7, 3, 8, generator=torch.Generator().manual_seed(14))
+        N = torch.randn(7, 3, 8, generator=torch.Generator().manual_seed(15))
+        assert torch.equal(layer.conditional_cross_messages(H, N)[CROSS_PAIR_KEYS[0]],
+                           torch.zeros(7, 8))
+
+
+def test_conditional_init_forward_equals_diag_path():
+    """p = 0.5 and T = 0 at init, so m = p * T(.) = 0 exactly: both O2-B1
+    variants must reproduce DIAG-ID forward bitwise."""
+    torch.manual_seed(0)
+    x, data_info = _make_data()
+    edge_index = _random_graph(x.size(0), 30, seed=13)
+    torch.manual_seed(5)
+    m_id = Model(_make_cfg(variant="diag_id"), data_info).eval()
+    torch.manual_seed(5)
+    m_dup = Model(_make_cfg(variant="conditional_cross_dup"), data_info).eval()
+    torch.manual_seed(5)
+    m_cross = Model(_make_cfg(variant="conditional_cross"), data_info).eval()
+
+    with torch.no_grad():
+        z_id, _, _, _, _ = m_id(x, edge_index)
+        z_dup, _, _, _, _ = m_dup(x, edge_index)
+        z_cross, _, _, _, _ = m_cross(x, edge_index)
+        H0_id, H1_id, _ = m_id.encode_states(x, edge_index, device=torch.device("cpu"))
+        _, H1_dup, stats_dup = m_dup.encode_states(x, edge_index, device=torch.device("cpu"))
+    assert torch.equal(z_id, z_dup)
+    assert torch.equal(z_id, z_cross)
+    assert torch.equal(H1_id, H1_dup)
+    assert torch.equal(stats_dup["cross_update_ratio"], torch.zeros(3))
+    assert torch.equal(stats_dup["cross_to_diag_ratio"], torch.zeros(3))
+    for key in CROSS_PAIR_KEYS:
+        assert float(stats_dup[f"cross_pair_ratio_{key}"]) == 0.0
+        assert float(stats_dup[f"effective_cross_pair_ratio_{key}"]) == 0.0
+        assert float(stats_dup[f"transfer_mean_{key}"]) == 0.5
+        assert float(stats_dup[f"transfer_std_{key}"]) == 0.0
+
+
+def test_conditional_cross_payload_follows_source_slot():
+    """CONDITIONAL-CROSS causality when only the C ownership state moves.
+
+    Raw payloads: exactly the two C-sourced payloads change. Router: only the
+    pairs TARGETING C change (C is part of their target context) — the pairs
+    sourced by C keep their probability bitwise, because the router never reads
+    source content. Routed messages therefore move on four pairs (two via the
+    payload, two via the target-C router context) and stay bitwise on the two
+    pairs that neither source nor target C.
+    """
+    layer = ConditionalCrossLayer(factor_dim=8, dup=False)
+    _randomize_cross(layer, seed=1)
+    _randomize_router(layer, seed=2)
+    H = torch.randn(12, 3, 8, generator=torch.Generator().manual_seed(3))
+    N = torch.randn(12, 3, 8, generator=torch.Generator().manual_seed(4))
+    perturbed = N.clone()
+    perturbed[:, 0] = perturbed[:, 0] + 1.0  # source slot C only
+
+    # raw payloads follow the source slot
+    base_payloads = layer.cross_messages(N)
+    payloads = layer.cross_messages(perturbed)
+    assert not torch.equal(payloads["c_to_pt"], base_payloads["c_to_pt"])
+    assert not torch.equal(payloads["c_to_pv"], base_payloads["c_to_pv"])
+    for key in ("pt_to_c", "pt_to_pv", "pv_to_c", "pv_to_pt"):
+        assert torch.equal(payloads[key], base_payloads[key]), f"{key} payload"
+
+    # router probability moves only for pairs whose TARGET is the perturbed slot
+    p_base = layer.router_transfer(H, N)
+    p_pert = layer.router_transfer(H, perturbed)
+    for key in CROSS_PAIR_KEYS:
+        a_name, b_name = key.split("_to_")
+        a, b = SLOT_NAMES.index(a_name), SLOT_NAMES.index(b_name)
+        if b == 0:
+            assert not torch.equal(p_pert[key], p_base[key]), key
+        else:
+            assert torch.equal(p_pert[key], p_base[key]), key
+
+    # routed messages: the four pairs touching C move, the other two do not
+    base = layer.conditional_cross_messages(H, N)
+    msgs = layer.conditional_cross_messages(H, perturbed)
+    for key in ("c_to_pt", "c_to_pv", "pt_to_c", "pv_to_c"):
+        assert not torch.equal(msgs[key], base[key]), key
+    for key in ("pt_to_pv", "pv_to_pt"):
+        assert torch.equal(msgs[key], base[key]), key
+
+    delta_base = layer.combine_cross(base)
+    delta = layer.combine_cross(msgs)
+    for b in range(3):  # every target is reachable from C through one of the two
+        assert not torch.equal(delta[:, b], delta_base[:, b]), b
+
+
+def test_conditional_dup_payload_ignores_other_source_states():
+    """CONDITIONAL-DUP: the routed payload reads only N^b, so changing another
+    ownership source N^a (a != b) leaves target b's routed message bitwise
+    unchanged — same conditional machinery, no ownership information."""
+    layer = ConditionalCrossLayer(factor_dim=8, dup=True)
+    _randomize_cross(layer, seed=3)
+    _randomize_router(layer, seed=4)
+    H = torch.randn(12, 3, 8, generator=torch.Generator().manual_seed(5))
+    N = torch.randn(12, 3, 8, generator=torch.Generator().manual_seed(6))
+    base = layer.conditional_cross_messages(H, N)
+    perturbed = N.clone()
+    perturbed[:, 0] = perturbed[:, 0] + 1.0  # perturb source ownership C
+
+    msgs = layer.conditional_cross_messages(H, perturbed)
+    for key in CROSS_PAIR_KEYS:
+        b = CROSS_PAIR_TARGET_SLOT[key]
+        if b == 0:
+            assert not torch.equal(msgs[key], base[key]), key
+        else:
+            assert torch.equal(msgs[key], base[key]), key
+
+    delta_base = layer.combine_cross(base)
+    delta = layer.combine_cross(msgs)
+    assert torch.equal(delta[:, 1], delta_base[:, 1])
+    assert torch.equal(delta[:, 2], delta_base[:, 2])
+    assert not torch.equal(delta[:, 0], delta_base[:, 0])
+
+
+def test_conditional_variants_router_logits_match():
+    """Both variants share the same router definition: given the same target
+    context they must return bitwise-identical logits and probabilities."""
+    x, data_info = _make_data()
+    torch.manual_seed(77)
+    m_dup = Model(_make_cfg(variant="conditional_cross_dup"), data_info)
+    torch.manual_seed(77)
+    m_cross = Model(_make_cfg(variant="conditional_cross"), data_info)
+    l_dup, l_cross = m_dup.diag_layers[0], m_cross.diag_layers[0]
+    # same seed -> same perturbation on both, since their init is identical
+    _randomize_router(l_dup, seed=8)
+    _randomize_router(l_cross, seed=8)
+
+    H = torch.randn(10, 3, 8, generator=torch.Generator().manual_seed(9))
+    N = torch.randn(10, 3, 8, generator=torch.Generator().manual_seed(10))
+    p_dup = l_dup.router_transfer(H, N)
+    p_cross = l_cross.router_transfer(H, N)
+    for key in CROSS_PAIR_KEYS:
+        assert torch.equal(p_dup[key], p_cross[key]), key
+
+
+def test_first_backward_transfer_grad_nonzero_router_grad_zero():
+    """Step 1: dL/dp ∝ T(x) = 0, so the router gets EXACTLY zero gradient while
+    all six transfer maps do receive gradient. Expected, not a bug."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="conditional_cross")
+    edge_index = _random_graph(x.size(0), 40, seed=31)
+    model.train()
+    z, _, _, aux_loss, _ = model(x, edge_index)
+    (z.mean() + aux_loss).backward()
+    layer = model.diag_layers[0]
+    for key in CROSS_PAIR_KEYS:
+        grad = layer.cross[key].weight.grad
+        assert grad is not None and grad.abs().sum().item() > 0.0, key
+    assert layer.router[0].weight.grad.abs().sum().item() == 0.0
+    assert layer.router[2].weight.grad.abs().sum().item() == 0.0
+    assert layer.factor_embed.weight.grad.abs().sum().item() == 0.0
+
+
+def test_second_backward_router_grad_nonzero():
+    """After the transfer maps move once, the router head receives non-zero
+    gradient (its trunk needs one more step because the head was zero-init)."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="conditional_cross")
+    edge_index = _random_graph(x.size(0), 40, seed=31)
+    model.train()
+    z, _, _, _, _ = model(x, edge_index)
+    z.mean().backward()
+    layer = model.diag_layers[0]
+    with torch.no_grad():
+        g = torch.Generator().manual_seed(33)
+        for key in CROSS_PAIR_KEYS:
+            layer.cross[key].weight.add_(
+                torch.randn(8, 8, generator=g) * 0.05
+            )
+    model.zero_grad(set_to_none=True)
+
+    z, _, _, _, _ = model(x, edge_index)
+    z.mean().backward()
+    assert layer.router[2].weight.grad.abs().sum().item() > 0.0
+    assert layer.router[2].bias.grad.abs().sum().item() > 0.0
+    # trunk still waits: dL/dh = dL/dlogits @ W_head, and W_head was zero
+    assert layer.router[0].weight.grad.abs().sum().item() == 0.0
+
+
+def test_conditional_empty_graph_updates_exactly_zero():
+    """Empty graph -> N = 0 -> payload = T(0) = 0 exactly, so diag and routed
+    cross updates are zero for both variants (the router still emits p)."""
+    empty = torch.empty((2, 0), dtype=torch.long)
+    for dup in (False, True):
+        layer = ConditionalCrossLayer(factor_dim=8, dup=dup)
+        _randomize_cross(layer, seed=7)
+        _randomize_router(layer, seed=8)
+        H = torch.randn(10, 3, 8, generator=torch.Generator().manual_seed(9))
+        H_next, stats = layer.propagate(H, empty)
+        for a in range(3):
+            assert torch.equal(H_next[:, a], layer.norm[a](H[:, a]))
+        assert torch.equal(stats["diag_update_ratio"], torch.zeros(3))
+        assert torch.equal(stats["neighbor_norm"], torch.zeros(3))
+        assert torch.equal(stats["cross_update_ratio"], torch.zeros(3))
+        assert torch.equal(stats["cross_to_diag_ratio"], torch.zeros(3))
+        for key in CROSS_PAIR_KEYS:
+            assert float(stats[f"cross_pair_ratio_{key}"]) == 0.0
+            assert float(stats[f"effective_cross_pair_ratio_{key}"]) == 0.0
+
+
+def test_conditional_isolated_node_graph_update_exactly_zero():
+    """A node with no in-edges gets H_next == LayerNorm(H) exactly, both variants."""
+    edge_index = torch.tensor([[1, 2, 3], [2, 3, 1]], dtype=torch.long)  # node 0 isolated
+    for dup in (False, True):
+        layer = ConditionalCrossLayer(factor_dim=8, dup=dup)
+        _randomize_cross(layer, seed=10)
+        _randomize_router(layer, seed=11)
+        H = torch.randn(6, 3, 8, generator=torch.Generator().manual_seed(12))
+        H_next, _ = layer.propagate(H, edge_index)
+        for a in range(3):
+            assert torch.equal(
+                H_next[0, a], layer.norm[a](H[0, a] + torch.zeros_like(H[0, a]))
+            )
+
+
+def test_conditional_aux_keys_present_and_static_unchanged():
+    """Key-surface regression: conditional variants emit the O2-A keys plus the
+    router/effective keys (64 total with P0); static variants stay at 40 and
+    diag variants at 16 — no conditional key leaks into an older variant."""
+    counts = {}
+    for variant in ("diag_id", "static_cross", "conditional_cross"):
+        torch.manual_seed(0)
+        model, x = _make_model(variant=variant)
+        edge_index = _random_graph(x.size(0), 30, seed=17)
+        model.train()
+        _, _, _, aux_loss, aux_info = model(x, edge_index)
+        assert float(aux_loss) > 0.0
+        counts[variant] = len(aux_info)
+        for slot in SLOT_NAMES:
+            assert f"oft_l1_{slot}_diag_update_ratio" in aux_info
+    assert counts == {"diag_id": 16, "static_cross": 40, "conditional_cross": 64}
+
+    torch.manual_seed(0)
+    model, x = _make_model(variant="conditional_cross")
+    edge_index = _random_graph(x.size(0), 30, seed=17)
+    model.train()
+    _, _, _, _, aux_info = model(x, edge_index)
+    for key in CROSS_PAIR_KEYS:
+        assert f"oft_l1_{key}_transfer_mean" in aux_info
+        assert f"oft_l1_{key}_transfer_std" in aux_info
+        assert f"oft_l1_{key}_router_entropy" in aux_info
+        assert f"oft_l1_{key}_effective_cross_pair_ratio" in aux_info
+        assert f"oft_l1_{key}_cross_pair_ratio" in aux_info
+    for key, value in aux_info.items():
+        assert value.numel() == 1, key  # only scalars reach the log surface
+
+    # the static variants must NOT grow the conditional keys
+    torch.manual_seed(0)
+    model, x = _make_model(variant="static_cross")
+    edge_index = _random_graph(x.size(0), 30, seed=17)
+    model.train()
+    _, _, _, _, aux_info = model(x, edge_index)
+    assert not any("transfer_mean" in key or "router_entropy" in key for key in aux_info)
+
+
+def test_effective_pair_ratio_bounded_by_raw():
+    """Routed magnitude is p * raw with p <= 1, so the effective ratio can never
+    exceed the raw one, and neither is numerically anomalous."""
+    layer = ConditionalCrossLayer(factor_dim=8)
+    _randomize_cross(layer, seed=13)
+    _randomize_router(layer, seed=14)
+    H = torch.randn(64, 3, 8, generator=torch.Generator().manual_seed(15))
+    edge_index = _random_graph(64, 400, seed=16)
+    _, stats = layer.propagate(H, edge_index)
+    for key in CROSS_PAIR_KEYS:
+        raw = float(stats[f"cross_pair_ratio_{key}"])
+        eff = float(stats[f"effective_cross_pair_ratio_{key}"])
+        assert eff <= raw + 1e-6, (key, raw, eff)
+        assert 0.0 <= eff <= 10.0 and torch.isfinite(torch.tensor([raw, eff])).all()
+        p = float(stats[f"transfer_mean_{key}"])
+        assert 0.0 <= p <= 1.0
+
+
+def test_conditional_no_giant_edge_pair_tensor():
+    """Profiler shape audit for the conditional layer: still no [E, S, S, ...] op."""
+    torch.manual_seed(0)
+    layer = ConditionalCrossLayer(factor_dim=8)
+    _randomize_cross(layer, seed=21)
+    _randomize_router(layer, seed=22)
+    num_nodes, n_edges = 512, 4096
+    edge_index = _random_graph(num_nodes, n_edges, seed=23)
+    H = torch.randn(num_nodes, 3, 8, generator=torch.Generator().manual_seed(25))
+    try:
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU], record_shapes=True
+        ) as prof:
+            layer.propagate(H, edge_index)
+    except (torch.profiler.ProfilerError, RuntimeError):
+        pytest.skip("torch profiler with record_shapes unavailable")
+    S = 3
+    offenders = []
+    for evt in prof.events():
+        for shape in getattr(evt, "input_shapes", None) or []:
+            if len(shape) >= 3 and shape[0] == n_edges and shape[1] == S and shape[2] == S:
+                offenders.append((evt.key, shape))
+    assert not offenders, f"giant [E,S,S,...] tensor ops: {offenders[:5]}"
+
+
+def test_conditional_variants_enforce_single_layer():
+    """O2-B1 is a single-layer scaffold like O1 / O1.5 / O2-A."""
+    x, data_info = _make_data()
+    for variant in ("conditional_cross", "conditional_cross_dup"):
+        with pytest.raises(ValueError, match="num_layers=1"):
+            Model(_make_cfg(variant=variant, num_layers=2), data_info)
+
+
+def test_conditional_encode_states_matches_forward_h1():
+    """The offline diagnostics hook exposes exactly the H1 the forward uses, and
+    the diagnostic helper recomputes the same N the layer routes on."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="conditional_cross")
+    layer = model.diag_layers[0]
+    _randomize_cross(layer, seed=27)
+    _randomize_router(layer, seed=28)
+    edge_index = _random_graph(x.size(0), 26, seed=29)
+    model.eval()
+    with torch.no_grad():
+        H0, H1, stats = model.encode_states(x, edge_index, device=torch.device("cpu"))
+        H1_manual, stats_manual = layer.propagate(H0, edge_index)
+        N = layer.neighbor_states(H0, edge_index)
+        transfer = layer.router_transfer(H0, N)
+    assert torch.equal(H1, H1_manual)
+    for key in ("cross_update_ratio", "cross_to_diag_ratio"):
+        assert torch.equal(stats[key], stats_manual[key]), key
+    for key in CROSS_PAIR_KEYS:
+        assert torch.equal(
+            stats[f"transfer_mean_{key}"], transfer[key].mean()
+        ), key
+        assert torch.equal(
+            stats[f"effective_cross_pair_ratio_{key}"],
+            stats_manual[f"effective_cross_pair_ratio_{key}"],
+        ), key
+    post = post_transition_stats(H0, H1)
+    assert float(post["post_cos_c_pt"]) == pytest.approx(
+        float(post_transition_stats(H0, H1_manual)["post_cos_c_pt"]), abs=1e-6
+    )
+    assert torch.isfinite(H1).all() and torch.isfinite(H0).all()

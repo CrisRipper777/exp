@@ -256,6 +256,222 @@ class StaticCrossLayer(DiagIDLayer):
         return H_next, stats
 
 
+def binary_entropy(p: Tensor, eps: float = 1e-8) -> Tensor:
+    """Binary entropy H(p) = -p log p - (1-p) log(1-p), elementwise.
+
+    Used as an O2-B1 router diagnostic: H = 0 means the router is fully
+    committed to Null or Transfer for that node, H = log 2 means undecided.
+    """
+    q = p.clamp(min=eps, max=1.0 - eps)
+    return -(q * q.log() + (1.0 - q) * (1.0 - q).log())
+
+
+class ConditionalCrossLayer(StaticCrossLayer):
+    """O2-B1 CONDITIONAL-CROSS layer: DIAG-ID backbone + target-conditioned
+    Null-vs-Transfer routing over the six off-diagonal cross maps.
+
+    Diagonal path is inherited unchanged (same V_a / D_a / LN_a modules, same
+    ``incoming_mean``, no self-loop, no GCN norm):
+
+        X_i^a         = V_a H_i^a
+        N_i^a         = incoming neighbor mean over X^a
+        Delta_diag_i^b = D_b N_i^b
+
+    O2-A's six bias-free maps ``T_{a->b}`` (a != b, zero-initialized) are reused
+    verbatim as the Transfer operator ``B_transfer``; the Null operator is
+    ``B_null(x) = 0``. Instead of applying the transfer unconditionally, a
+    single SHARED router decides per node and per pair:
+
+        q_i^{ab}          = [ H_i^b | N_i^b | e_a | e_b ]        # TARGET-ONLY context
+        [l_null, l_tr]    = Router(q_i^{ab})                     # Linear->GELU->Linear(2)
+        p_i^{ab}          = softmax([l_null, l_tr])              # p_null + p_transfer = 1
+        payload_i^{a->b}  = T_{a->b}(N_i^a)                      # CONDITIONAL-CROSS
+                          = T_{a->b}(N_i^b)                      # CONDITIONAL-DUP (control)
+        m_i^{a->b}        = p_transfer_i^{ab} * payload_i^{a->b}
+        Delta_cross_i^b   = (1 / (S-1)) * sum_{a != b} m_i^{a->b}
+        H_next_i^b        = LN_b( H_i^b + Delta_diag_i^b + Delta_cross_i^b )
+
+    CRITICAL CONTROL DISCIPLINE: the router reads the TARGET's own state
+    ``H^b`` / ``N^b`` plus the two factor *identity* embeddings ``e_a`` / ``e_b``
+    (indices, not content). It never reads the source ownership state
+    ``H^a`` / ``N^a``, any same-node [C|Pt|Pv] conditioner, or any cross-source
+    statistic. Otherwise CONDITIONAL-DUP — whose payload deliberately ignores
+    the real source — could still see source ownership content through the
+    router, and the matched control would be contaminated. See
+    ``test_router_reads_target_context_only``.
+
+    ``dup`` is the ONLY behavioural switch between the two O2-B1 variants
+    (identical modules, params, init, optimizer presence, router and target
+    update): ``dup=True`` feeds every pair module the target's own ``N^b``, so
+    the conditional machinery is identical and only the payload's ownership
+    information differs.
+
+    Initialization: the router's last Linear is zero-initialized (no Null
+    prior bias) so step 0 gives exactly ``p_null = p_transfer = 0.5``, and the
+    six ``T_{a->b}`` stay zero-initialized, so ``m = p * T(.) = 0`` exactly and
+    both variants start strictly as DIAG-ID. Because ``dL/dp ∝ T(x) = 0``, the
+    router receives exactly zero gradient on the first backward pass; the
+    transfer maps move first, and the router starts learning afterwards. This
+    is expected, not a bug.
+    """
+
+    def __init__(
+        self,
+        factor_dim: int = 128,
+        eps: float = 1e-8,
+        dup: bool = False,
+        embed_dim: int = 16,
+        router_hidden: int = 128,
+    ) -> None:
+        super().__init__(factor_dim, eps, dup)
+        self.embed_dim = int(embed_dim)
+        self.router_hidden = int(router_hidden)
+        # One embedding table serves both source and target factor identities.
+        self.factor_embed = nn.Embedding(NUM_SLOTS, self.embed_dim)
+        # ONE shared router for all six pairs; pair identity comes from e_a/e_b.
+        self.router = nn.Sequential(
+            nn.Linear(2 * self.factor_dim + 2 * self.embed_dim, self.router_hidden),
+            nn.GELU(),
+            nn.Linear(self.router_hidden, 2),
+        )
+        nn.init.zeros_(self.router[-1].weight)
+        nn.init.zeros_(self.router[-1].bias)
+
+    # ------------------------------------------------------------------
+    # Router
+    # ------------------------------------------------------------------
+
+    @property
+    def router_input_dim(self) -> int:
+        return 2 * self.factor_dim + 2 * self.embed_dim
+
+    def pair_context(self, H: Tensor, N: Tensor, a: int, b: int) -> Tensor:
+        """Target-only router input ``[H^b | N^b | e_a | e_b]`` -> ``[N, D]``.
+
+        Only the TARGET slot ``b`` is read from the states; the source enters
+        solely through the identity embedding ``e_a``.
+        """
+        n = int(H.size(0))
+        idx = torch.tensor([a, b], device=H.device, dtype=torch.long)
+        emb = self.factor_embed(idx)  # [2, E]
+        e_a = emb[0].unsqueeze(0).expand(n, -1)
+        e_b = emb[1].unsqueeze(0).expand(n, -1)
+        return torch.cat([H[:, b], N[:, b], e_a, e_b], dim=-1)
+
+    def pair_logits(self, H: Tensor, N: Tensor, a: int, b: int) -> Tensor:
+        """Raw router logits ``[l_null, l_transfer]`` -> ``[N, 2]``."""
+        return self.router(self.pair_context(H, N, a, b))
+
+    def router_transfer(self, H: Tensor, N: Tensor) -> dict[str, Tensor]:
+        """Per-node transfer probability for every off-diagonal pair.
+
+        ``{pair_key: p_transfer_i^{ab} [N]}``, all from the same shared router.
+        """
+        transfer: dict[str, Tensor] = {}
+        for key in CROSS_PAIR_KEYS:
+            a_name, b_name = key.split("_to_")
+            a, b = SLOT_NAMES.index(a_name), SLOT_NAMES.index(b_name)
+            probs = torch.softmax(self.pair_logits(H, N, a, b), dim=-1)  # [N, 2]
+            transfer[key] = probs[:, 1]
+        return transfer
+
+    def neighbor_states(self, H: Tensor, edge_index: Tensor | None) -> Tensor:
+        """Recompute the target neighborhood states ``N`` from ``H``.
+
+        Diagnostic helper (offline scripts); identical arithmetic to the
+        ``V_a`` -> ``incoming_mean`` part of ``propagate``.
+        """
+        X = torch.stack(
+            [self.V[a](H[:, a]) for a in range(self.num_slots)], dim=1
+        )
+        return incoming_mean(X, edge_index, int(H.size(0)))
+
+    # ------------------------------------------------------------------
+    # Conditional cross branch
+    # ------------------------------------------------------------------
+
+    def conditional_cross_messages(self, H: Tensor, N: Tensor) -> dict[str, Tensor]:
+        """Routed pair messages ``m_i^{a->b} = p_transfer_i^{ab} * T_{a->b}(.)``.
+
+        ``cross_messages(N)`` (inherited) supplies the raw un-routed payloads;
+        the source slot it reads is set by ``dup``.
+        """
+        transfer = self.router_transfer(H, N)
+        payloads = self.cross_messages(N)
+        return {
+            key: transfer[key].unsqueeze(-1) * payloads[key] for key in CROSS_PAIR_KEYS
+        }
+
+    def cross_update(self, N: Tensor) -> Tensor:  # pragma: no cover - guard
+        raise NotImplementedError(
+            "ConditionalCrossLayer routes with the target context H; use "
+            "conditional_cross_messages(H, N) instead of the static cross_update(N)"
+        )
+
+    # ------------------------------------------------------------------
+    # Propagation
+    # ------------------------------------------------------------------
+
+    def propagate(
+        self, H: Tensor, edge_index: Tensor | None
+    ) -> tuple[Tensor, dict[str, Tensor]]:
+        """H ``[N, S, F]`` -> (H_next, stats).
+
+        The diagonal block is written out verbatim as in
+        ``StaticCrossLayer.propagate`` (same ops, same order) so the O2-A /
+        O1 paths stay untouched; the cross block is routed. Stats keys:
+        the O2-A ones plus, per pair, the raw vs effective magnitude and the
+        router's transfer mean/std/entropy (all detached scalars).
+        """
+        num_nodes = int(H.size(0))
+        X = torch.stack(
+            [self.V[a](H[:, a]) for a in range(self.num_slots)], dim=1
+        )  # [N, S, F]
+        N = incoming_mean(X, edge_index, num_nodes)  # [N, S, F]
+        delta_diag = torch.stack(
+            [self.D[a](N[:, a]) for a in range(self.num_slots)], dim=1
+        )  # [N, S, F]
+
+        transfer = self.router_transfer(H, N)  # {key: [N]}
+        payloads = self.cross_messages(N)  # raw T_{a->b}(payload)
+        messages = {
+            key: transfer[key].unsqueeze(-1) * payloads[key] for key in CROSS_PAIR_KEYS
+        }
+        delta_cross = self.combine_cross(messages)  # [N, S, F]
+
+        H_next = torch.stack(
+            [
+                self.norm[b](H[:, b] + delta_diag[:, b] + delta_cross[:, b])
+                for b in range(self.num_slots)
+            ],
+            dim=1,
+        )  # [N, S, F]
+
+        with torch.no_grad():
+            h_norm = H.norm(dim=-1)  # [N, S]
+            d_norm = delta_diag.norm(dim=-1)
+            c_norm = delta_cross.norm(dim=-1)
+            n_norm = N.norm(dim=-1)
+            stats = {
+                "diag_update_ratio": (d_norm / (h_norm + self.eps)).mean(dim=0),
+                "neighbor_norm": n_norm.mean(dim=0),
+                "cross_update_ratio": (c_norm / (h_norm + self.eps)).mean(dim=0),
+                "cross_to_diag_ratio": (c_norm / (d_norm + self.eps)).mean(dim=0),
+            }
+            for key in CROSS_PAIR_KEYS:
+                target = CROSS_PAIR_TARGET_SLOT[key]
+                denom = h_norm[:, target] + self.eps
+                raw_norm = payloads[key].norm(dim=-1)
+                eff_norm = messages[key].norm(dim=-1)
+                p = transfer[key]
+                stats[f"cross_pair_ratio_{key}"] = (raw_norm / denom).mean()
+                stats[f"effective_cross_pair_ratio_{key}"] = (eff_norm / denom).mean()
+                stats[f"transfer_mean_{key}"] = p.mean()
+                stats[f"transfer_std_{key}"] = p.std(unbiased=False)
+                stats[f"router_entropy_{key}"] = binary_entropy(p).mean()
+        return H_next, stats
+
+
 def post_transition_stats(H0: Tensor, H1: Tensor, eps: float = 1e-8) -> dict[str, Tensor]:
     """O2-A post-transition ownership diagnostics comparing H0 and H1.
 

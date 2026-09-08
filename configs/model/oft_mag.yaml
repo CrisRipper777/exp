@@ -17,6 +17,11 @@ norm: layernorm
 # static branch of six zero-init C_{a->b} for a != b):
 #   static_cross_dup — capacity-matched control, cross branch reads N^b (target)
 #   static_cross     — treatment, cross branch reads N^a (real other ownership)
+# O2-B1 adds target-conditioned Null-vs-Transfer routing over those six maps
+# (one shared router + factor embeddings; router input is target-only:
+# [H^b | N^b | e_a | e_b], never source content):
+#   conditional_cross_dup — capacity-matched control, payload reads N^b (target)
+#   conditional_cross     — treatment, payload reads N^a (real other ownership)
 variant: diag_id
 # O1 / O1.5 are single-layer scaffolds by design (no multi-scale). The model
 # module raises unless num_layers == 1.

@@ -7,6 +7,7 @@ from torch import Tensor
 from .biaxis_p0 import Model as P0Model
 from .oft_components import (
     CROSS_PAIR_KEYS,
+    ConditionalCrossLayer,
     DiagIDLayer,
     NUM_SLOTS,
     SLOT_NAMES,
@@ -17,18 +18,32 @@ from .oft_components import (
 # Slot <-> factorizer key map. Permanently fixed: 0=C, 1=Pt, 2=Pv.
 _FACTOR_KEYS = ("c", "p_t", "p_v")
 
-# O1 / O1.5 / O2-A variants (config ``model.variant``):
-#   diag_id          — O1 OFT-DIAG-ID: real graph propagation through V/D/LN.
-#   diag_nograph     — O1.5 strict matched no-topology control: the graph input
-#                      is routed away so the neighbor response is exactly zero
-#                      (see Model docstring). Same params / init / fusion / losses.
-#   static_cross_dup — O2-A capacity-matched control: same DIAG backbone plus a
-#                      static cross branch that reads the TARGET's own neighbor
-#                      state N^b through every off-diagonal module C_{a->b}.
-#   static_cross     — O2-A treatment: the cross branch reads the real SOURCE
-#                      ownership states N^a (a != b).
-VARIANTS = ("diag_id", "diag_nograph", "static_cross_dup", "static_cross")
-_CROSS_VARIANTS = ("static_cross_dup", "static_cross")
+# O1 / O1.5 / O2-A / O2-B1 variants (config ``model.variant``):
+#   diag_id               — O1 OFT-DIAG-ID: real graph propagation through V/D/LN.
+#   diag_nograph          — O1.5 strict matched no-topology control: the graph
+#                           input is routed away so the neighbor response is
+#                           exactly zero (see Model docstring). Same params /
+#                           init / fusion / losses.
+#   static_cross_dup      — O2-A capacity-matched control: same DIAG backbone plus
+#                           a static cross branch that reads the TARGET's own
+#                           neighbor state N^b through every off-diagonal map.
+#   static_cross          — O2-A treatment: the cross branch reads the real
+#                           SOURCE ownership states N^a (a != b).
+#   conditional_cross_dup — O2-B1 capacity-matched control: identical O2-A cross
+#                           branch + a target-conditioned Null-vs-Transfer router,
+#                           but every payload still reads the target's own N^b.
+#   conditional_cross     — O2-B1 treatment: same router, real source payload N^a.
+VARIANTS = (
+    "diag_id",
+    "diag_nograph",
+    "static_cross_dup",
+    "static_cross",
+    "conditional_cross_dup",
+    "conditional_cross",
+)
+_STATIC_CROSS_VARIANTS = ("static_cross_dup", "static_cross")
+_CONDITIONAL_CROSS_VARIANTS = ("conditional_cross_dup", "conditional_cross")
+_CROSS_VARIANTS = _STATIC_CROSS_VARIANTS + _CONDITIONAL_CROSS_VARIANTS
 
 
 def stack_factor_slots(factors: dict[str, Tensor]) -> Tensor:
@@ -66,6 +81,15 @@ class Model(P0Model):
     control STATIC-CROSS-DUP feeds the target's own N^b through the identical
     modules. Zero init makes step 0 exactly DIAG-ID for both.
 
+    O2-B1 ``conditional_cross`` / ``conditional_cross_dup`` (variant switch):
+    the O2-A construction is reused and the unconditional cross application is
+    replaced by a shared target-conditioned Null-vs-Transfer router
+    (``ConditionalCrossLayer``): one embedding table for factor identity, one
+    shared MLP reading ``[H^b | N^b | e_a | e_b]``, ``p_transfer`` multiplying
+    the same six zero-init maps, ``p_null`` realizing the Null operator. The
+    router NEVER reads source ownership content (see the layer docstring), so
+    the two variants differ only in the payload's ownership information.
+
     Framework interface (unchanged from P0):
         forward(x, edge_index) -> (z, None, None, aux_loss, aux_info)
         inference(x, edge_index, device, batch_size) -> z (CPU)
@@ -78,6 +102,9 @@ class Model(P0Model):
         oft_l1_{a_to_b}_cross_pair_ratio (6 pairs),
         oft_l1_post_cos_{a}_{b} / pre_cos_{a}_{b}, oft_l1_{c,pt,pv}_post_norm,
         oft_l1_{c,pt,pv}_state_drift.
+    and, for the O2-B1 conditional variants only,
+        oft_l1_{a_to_b}_transfer_mean / _transfer_std / _router_entropy,
+        oft_l1_{a_to_b}_effective_cross_pair_ratio (6 pairs each).
     """
 
     def __init__(self, cfg, data_info):
@@ -95,7 +122,15 @@ class Model(P0Model):
                 "(single-layer scaffold; no multi-scale)"
             )
         self.num_layers = num_layers
-        if variant in _CROSS_VARIANTS:
+        if variant in _CONDITIONAL_CROSS_VARIANTS:
+            dup = variant == "conditional_cross_dup"
+            self.diag_layers = nn.ModuleList(
+                [
+                    ConditionalCrossLayer(factor_dim=self.factor_dim, dup=dup)
+                    for _ in range(self.num_layers)
+                ]
+            )
+        elif variant in _STATIC_CROSS_VARIANTS:
             dup = variant == "static_cross_dup"
             self.diag_layers = nn.ModuleList(
                 [
@@ -128,9 +163,8 @@ class Model(P0Model):
         O1.5 ``diag_nograph``: the graph input is routed away here (single
         choke point, shared by forward/inference), so the layer executes its
         empty-graph path: N = 0, delta = D(0) = 0 exactly, H1 = LN(H0).
-        ``diag_id`` / ``static_cross`` / ``static_cross_dup`` all propagate on
-        the real graph; the two O2-A cross variants only differ inside their
-        ``StaticCrossLayer`` cross branch."""
+        ``diag_id`` and all cross variants propagate on the real graph; the
+        O2-A / O2-B1 variants only differ inside their cross layer."""
         x_t, x_v = self._split_modalities(x)
         factors = self.factorizer(x_t, x_v)
         H0 = stack_factor_slots(factors)  # [N, 3, F]
@@ -153,8 +187,11 @@ class Model(P0Model):
 
         O2-A cross variants additionally emit the cross-branch update ratios,
         the six per-pair contributions and the post-transition ownership
-        diagnostics. diag_id / diag_nograph keep exactly their O1/O1.5 key set
-        (their numerical semantics and log surface are unchanged)."""
+        diagnostics. O2-B1 conditional variants add, per pair, the router's
+        transfer mean/std/entropy and the effective (routed) pair magnitude.
+        diag_id / diag_nograph keep exactly their O1/O1.5 key set and the O2-A
+        variants keep exactly their O2-A key set (numerical semantics and log
+        surface unchanged)."""
         info = {}
         for slot_idx, name in enumerate(SLOT_NAMES):
             info[f"oft_l1_{name}_diag_update_ratio"] = stats["diag_update_ratio"][slot_idx]
@@ -166,6 +203,14 @@ class Model(P0Model):
             info[f"oft_l1_{name}_cross_to_diag_ratio"] = stats["cross_to_diag_ratio"][slot_idx]
         for key in CROSS_PAIR_KEYS:
             info[f"oft_l1_{key}_cross_pair_ratio"] = stats[f"cross_pair_ratio_{key}"]
+        if self.variant in _CONDITIONAL_CROSS_VARIANTS:
+            for key in CROSS_PAIR_KEYS:
+                info[f"oft_l1_{key}_transfer_mean"] = stats[f"transfer_mean_{key}"]
+                info[f"oft_l1_{key}_transfer_std"] = stats[f"transfer_std_{key}"]
+                info[f"oft_l1_{key}_router_entropy"] = stats[f"router_entropy_{key}"]
+                info[f"oft_l1_{key}_effective_cross_pair_ratio"] = stats[
+                    f"effective_cross_pair_ratio_{key}"
+                ]
         if H0 is not None and H1 is not None:
             for key, value in post_transition_stats(H0, H1).items():
                 info[f"oft_l1_{key}"] = value
