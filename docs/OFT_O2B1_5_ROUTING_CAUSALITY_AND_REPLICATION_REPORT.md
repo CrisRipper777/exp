@@ -24,7 +24,7 @@ Movies / NC / Val-only / best-Val-Acc / `cuda:1` / seed42 locked + seed43/44 rep
 | starting HEAD | `93015ebede9e9424146873bad138e35b94a217a7`（`O2-B1: record final commit SHA in conditional-routing report`，文档补记 commit；其父为 O2-B1 代码 commit `36fec95780638814778ffccdea59417fa8a2f32e`） |
 | ancestor 检查 | `git merge-base --is-ancestor oft-o2b1-conditional-routing HEAD` → **通过**（未 reset） |
 | 起始工作区 | clean（`git status --short` 为空） |
-| ending SHA | 本阶段主 commit `O2-B1.5: audit routing granularity and replicate across seeds`；其精确 SHA 见 §36 Commit 段落（按 O2-B1 惯例由仅文档补记 commit 回填） |
+| ending SHA | `32455971259ea04a050c8203291bcb0db4069211`（本阶段主 commit `O2-B1.5: audit routing granularity and replicate across seeds`） |
 | tag | `oft-o2b1-5-routing-audit`（打在本阶段主 commit 上） |
 
 ## 2. Files changed（条目 2）
@@ -529,8 +529,9 @@ git push origin oft-mag --tags
 | 项 | 值 |
 |---|---|
 | starting HEAD | `93015ebede9e9424146873bad138e35b94a217a7` |
-| O2-B1.5 commit | 见下方“回填”行（按 O2-B1 惯例，由仅文档补记 commit 写入） |
-| tag | `oft-o2b1-5-routing-audit` |
+| O2-B1.5 commit | `32455971259ea04a050c8203291bcb0db4069211` |
+| 本次补记 commit | 仅把上述 SHA 写入本报告（文档改动，无代码/实验变化） |
+| tag | `oft-o2b1-5-routing-audit`（打在 `3245597`） |
 
 ## 附：一句话总结
 
