@@ -1,0 +1,32 @@
+{
+  "ckpt": "outputs/oft_o1_5/diag_id_best.pt",
+  "label": "diag_id_parent",
+  "seed": 42,
+  "stats": {
+    "balanced_acc": 0.39459385044251793,
+    "diag_update_ratio_c": 0.30024346709251404,
+    "diag_update_ratio_pt": 0.4545004367828369,
+    "diag_update_ratio_pv": 0.45656925439834595,
+    "n_val": 3334.0,
+    "neighbor_norm_c": 2.0865063667297363,
+    "neighbor_norm_pt": 3.470973014831543,
+    "neighbor_norm_pv": 2.481583595275879,
+    "params_head": 5140.0,
+    "params_model": 1136640.0,
+    "post_cos_c_pt": 0.03834306821227074,
+    "post_cos_c_pv": -0.030938977375626564,
+    "post_cos_pt_pv": 0.024507110938429832,
+    "post_norm_c": 11.311135292053223,
+    "post_norm_pt": 11.247220039367676,
+    "post_norm_pv": 11.411444664001465,
+    "pre_cos_c_pt": 0.036917492747306824,
+    "pre_cos_c_pv": -0.05137775093317032,
+    "pre_cos_pt_pv": 0.025835268199443817,
+    "state_drift_c": 0.04777102917432785,
+    "state_drift_pt": 0.05599415674805641,
+    "state_drift_pv": 0.08286579698324203,
+    "val_acc": 0.5503899455070496,
+    "val_macro_f1": 0.4270394950003931
+  },
+  "variant": "diag_id"
+}

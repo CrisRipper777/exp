@@ -30,21 +30,8 @@ from src.models.oft_mag import Model
 from src.tasks.common import load_state_dict_cpu
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--config", required=True, help="the run's .hydra/config.yaml")
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--device", default="cuda:1")
-    ap.add_argument("--label", default="", help="free-form row/echo label")
-    args = ap.parse_args()
-
-    ckpt = torch.load(args.ckpt, map_location="cpu", weights_only=False)
-    cfg = OmegaConf.load(args.config)
-    seed = int(cfg.seed)
-    data = load_mag_data(cfg, "nc", seed)
-    device = torch.device(args.device)
-
+def build_model_and_head(ckpt: dict, cfg, data, device: torch.device):
+    """Rebuild the exact trained model+head from a saved NC checkpoint."""
     data_info = {
         "input_dim": data.input_dim,
         "num_nodes": data.num_nodes,
@@ -59,7 +46,17 @@ def main() -> None:
     load_state_dict_cpu(model, ckpt["model_state"])
     load_state_dict_cpu(head, ckpt["head_state"])
     model.eval()
+    return model, head
 
+
+def val_per_class_rows(model, head, data, device: torch.device):
+    """Validation-only per-class table + summary metrics.
+
+    Returns (rows, summary) where rows carry class_id / support / recall /
+    precision / f1 / predicted_count / true_count (the O1.5-D schema, reused by
+    the O2-A diagnostics so there is only one implementation) and summary holds
+    val_acc / val_macro_f1 / balanced_acc / n_val. Never touches test_idx.
+    """
     z = model.inference(data.x, data.edge_index, device=device)  # CPU [N, out]
     with torch.no_grad():
         logits = head(z[data.val_idx].to(device)).cpu()
@@ -75,17 +72,9 @@ def main() -> None:
     )
     true_counts = torch.bincount(target, minlength=num_classes).numpy()
     pred_counts = torch.bincount(pred, minlength=num_classes).numpy()
-    balanced_acc = float(r.mean())
 
-    # checkpoint epoch = the epoch whose val acc was best (best-Acc selection).
-    best_ep = ckpt.get("best_epoch")
-    print(f"[{args.label or 'per-class'}] n_val={len(target)} val_acc={acc:.6f} "
-          f"val_macro_f1={macro_f1:.6f} balanced_acc={balanced_acc:.6f} "
-          f"(ckpt best_epoch={best_ep})")
-
-    rows = []
-    for c in range(num_classes):
-        rows.append({
+    rows = [
+        {
             "class_id": c,
             "support": int(true_counts[c]),
             "recall": r[c],
@@ -93,7 +82,44 @@ def main() -> None:
             "f1": f[c],
             "predicted_count": int(pred_counts[c]),
             "true_count": int(true_counts[c]),
-        })
+        }
+        for c in range(num_classes)
+    ]
+    summary = {
+        "val_acc": acc,
+        "val_macro_f1": macro_f1,
+        "balanced_acc": float(r.mean()),
+        "n_val": int(target.numel()),
+    }
+    return rows, summary
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ckpt", required=True)
+    ap.add_argument("--config", required=True, help="the run's .hydra/config.yaml")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--device", default="cuda:1")
+    ap.add_argument("--label", default="", help="free-form row/echo label")
+    args = ap.parse_args()
+
+    ckpt = torch.load(args.ckpt, map_location="cpu", weights_only=False)
+    cfg = OmegaConf.load(args.config)
+    seed = int(cfg.seed)
+    data = load_mag_data(cfg, "nc", seed)
+    device = torch.device(args.device)
+
+    model, head = build_model_and_head(ckpt, cfg, data, device)
+    rows, summary = val_per_class_rows(model, head, data, device)
+
+    # checkpoint epoch = the epoch whose val acc was best (best-Acc selection).
+    best_ep = ckpt.get("best_epoch")
+    print(f"[{args.label or 'per-class'}] n_val={summary['n_val']} "
+          f"val_acc={summary['val_acc']:.6f} "
+          f"val_macro_f1={summary['val_macro_f1']:.6f} "
+          f"balanced_acc={summary['balanced_acc']:.6f} "
+          f"(ckpt best_epoch={best_ep})")
+
     with open(args.out, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         writer.writeheader()

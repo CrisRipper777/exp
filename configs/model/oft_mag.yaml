@@ -13,6 +13,10 @@ norm: layernorm
 # diag_nograph: strict matched no-topology control — identical params/init/
 # fusion/losses, only the graph neighbor response is forced to zero
 # (edge_index routed away -> N=0 -> delta = D(0) = 0 exactly -> H1 = LN(H0)).
+# O2-A adds two cross-ownership variants (same DIAG backbone + an additive
+# static branch of six zero-init C_{a->b} for a != b):
+#   static_cross_dup — capacity-matched control, cross branch reads N^b (target)
+#   static_cross     — treatment, cross branch reads N^a (real other ownership)
 variant: diag_id
 # O1 / O1.5 are single-layer scaffolds by design (no multi-scale). The model
 # module raises unless num_layers == 1.

@@ -30,7 +30,15 @@ import pytest
 from omegaconf import OmegaConf
 
 from src.models import oft_mag
-from src.models.oft_components import DiagIDLayer, SLOT_NAMES, incoming_mean
+from src.models.oft_components import (
+    CROSS_PAIR_KEYS,
+    CROSS_PAIR_TARGET_SLOT,
+    DiagIDLayer,
+    SLOT_NAMES,
+    StaticCrossLayer,
+    incoming_mean,
+    post_transition_stats,
+)
 from src.models.oft_mag import Model, stack_factor_slots
 
 
@@ -544,3 +552,320 @@ def test_diag_nograph_output_equals_layernorm_then_fusion():
         )
         z, _, _, _, _ = model(x, edge_index)
     assert torch.equal(z, z_manual)
+
+
+# ----------------------------------------------------------------------
+# 15-26. O2-A: static cross-ownership utility test
+# ----------------------------------------------------------------------
+
+
+def _randomize_cross(layer: StaticCrossLayer, seed: int = 0, scale: float = 0.1) -> None:
+    """Break the zero-init for tests that need a live cross branch."""
+    g = torch.Generator().manual_seed(seed)
+    with torch.no_grad():
+        for key in CROSS_PAIR_KEYS:
+            layer.cross[key].weight.copy_(
+                torch.randn(layer.factor_dim, layer.factor_dim, generator=g) * scale
+            )
+
+
+def test_static_cross_and_dup_parameter_counts_match():
+    """STATIC-CROSS and its capacity-matched control must have identical
+    parameter counts, exactly diag_id + 6 * factor_dim^2 (the six C_{a->b})."""
+    x, data_info = _make_data()
+    fd = 8
+    models = {}
+    for variant in ("diag_id", "static_cross_dup", "static_cross"):
+        torch.manual_seed(11)
+        models[variant] = Model(_make_cfg(variant=variant, factor_dim=fd), data_info)
+
+    n_id = sum(p.numel() for p in models["diag_id"].parameters())
+    n_dup = sum(p.numel() for p in models["static_cross_dup"].parameters())
+    n_cross = sum(p.numel() for p in models["static_cross"].parameters())
+    assert n_dup == n_cross
+    assert n_cross - n_id == len(CROSS_PAIR_KEYS) * fd * fd == 6 * fd * fd
+    # the six maps are the only new parameters
+    assert len(models["static_cross"].diag_layers[0].cross) == 6
+
+
+def test_static_cross_and_dup_state_dict_identical_init():
+    """Same RNG stream -> identical state dicts (keys, shapes, values): the two
+    O2-A variants differ only in which slot the cross branch reads."""
+    x, data_info = _make_data()
+    torch.manual_seed(123)
+    m_dup = Model(_make_cfg(variant="static_cross_dup"), data_info)
+    torch.manual_seed(123)
+    m_cross = Model(_make_cfg(variant="static_cross"), data_info)
+
+    sd_dup, sd_cross = m_dup.state_dict(), m_cross.state_dict()
+    assert set(sd_dup) == set(sd_cross)
+    for key in sd_dup:
+        assert sd_dup[key].shape == sd_cross[key].shape, key
+        assert torch.equal(sd_dup[key], sd_cross[key]), f"{key} init differs"
+    assert m_dup.diag_layers[0].dup is True
+    assert m_cross.diag_layers[0].dup is False
+
+
+def test_six_cross_matrices_exist_only_off_diagonal():
+    """Exactly six off-diagonal pair modules; no diagonal (a == b) module, since
+    the existing per-slot D_a already owns the diagonal path."""
+    layer = StaticCrossLayer(factor_dim=8)
+    assert tuple(layer.cross.keys()) == CROSS_PAIR_KEYS
+    assert len(CROSS_PAIR_KEYS) == 6
+    for key in CROSS_PAIR_KEYS:
+        a_name, b_name = key.split("_to_")
+        assert a_name != b_name
+        assert layer.cross[key].weight.shape == (8, 8)
+        assert layer.cross[key].bias is None
+        assert CROSS_PAIR_TARGET_SLOT[key] == SLOT_NAMES.index(b_name)
+    # no identity / diagonal module anywhere
+    assert "c_to_c" not in layer.cross and "pt_to_pt" not in layer.cross and "pv_to_pv" not in layer.cross
+
+
+def test_cross_matrices_zero_initialized():
+    """Zero init: at step 0 Delta_cross == 0 for both variants, so both start
+    strictly as DIAG-ID."""
+    for dup in (False, True):
+        layer = StaticCrossLayer(factor_dim=8, dup=dup)
+        for key in CROSS_PAIR_KEYS:
+            assert torch.count_nonzero(layer.cross[key].weight) == 0, key
+        N = torch.randn(7, 3, 8, generator=torch.Generator().manual_seed(4))
+        assert torch.equal(layer.cross_update(N), torch.zeros(7, 3, 8))
+
+
+def test_init_forward_equals_diag_path():
+    """With zero-init cross weights, both O2-A variants must reproduce the
+    DIAG-ID forward exactly (same seed -> same backbone weights)."""
+    torch.manual_seed(0)
+    x, data_info = _make_data()
+    edge_index = _random_graph(x.size(0), 30, seed=13)
+    torch.manual_seed(5)
+    m_id = Model(_make_cfg(variant="diag_id"), data_info).eval()
+    torch.manual_seed(5)
+    m_dup = Model(_make_cfg(variant="static_cross_dup"), data_info).eval()
+    torch.manual_seed(5)
+    m_cross = Model(_make_cfg(variant="static_cross"), data_info).eval()
+
+    with torch.no_grad():
+        z_id, _, _, _, _ = m_id(x, edge_index)
+        z_dup, _, _, _, _ = m_dup(x, edge_index)
+        z_cross, _, _, _, _ = m_cross(x, edge_index)
+        H0_id, H1_id, _ = m_id.encode_states(x, edge_index, device=torch.device("cpu"))
+        _, H1_dup, stats_dup = m_dup.encode_states(x, edge_index, device=torch.device("cpu"))
+    assert torch.equal(z_id, z_dup)
+    assert torch.equal(z_id, z_cross)
+    assert torch.equal(H1_id, H1_dup)
+    # the cross branch is live but exactly zero at init
+    assert torch.equal(stats_dup["cross_update_ratio"], torch.zeros(3))
+    assert torch.equal(stats_dup["cross_to_diag_ratio"], torch.zeros(3))
+    for key in CROSS_PAIR_KEYS:
+        assert float(stats_dup[f"cross_pair_ratio_{key}"]) == 0.0
+
+
+def test_static_cross_messages_follow_source_slot():
+    """STATIC-CROSS: perturbing only the C source state must change exactly the
+    two C-sourced pair messages (C->Pt, C->Pv) and leave the other four
+    bitwise unchanged."""
+    layer = StaticCrossLayer(factor_dim=8, dup=False)
+    _randomize_cross(layer, seed=1)
+    N = torch.randn(12, 3, 8, generator=torch.Generator().manual_seed(2))
+    base = layer.cross_messages(N)
+    perturbed = N.clone()
+    perturbed[:, 0] = perturbed[:, 0] + 1.0  # source slot C only
+
+    msgs = layer.cross_messages(perturbed)
+    assert not torch.equal(msgs["c_to_pt"], base["c_to_pt"])
+    assert not torch.equal(msgs["c_to_pv"], base["c_to_pv"])
+    for key in ("pt_to_c", "pt_to_pv", "pv_to_c", "pv_to_pt"):
+        assert torch.equal(msgs[key], base[key]), f"{key} must not depend on N^C"
+
+    # same causal structure at the target-update level: the two targets that
+    # read N^C move, the target C (whose sources are Pt/Pv) does not.
+    delta_base = layer.cross_update(N)
+    delta = layer.cross_update(perturbed)
+    assert not torch.equal(delta[:, 1], delta_base[:, 1])  # target Pt <- C
+    assert not torch.equal(delta[:, 2], delta_base[:, 2])  # target Pv <- C
+    assert torch.equal(delta[:, 0], delta_base[:, 0])      # target C reads Pt/Pv
+
+
+def test_static_cross_dup_ignores_other_source_states():
+    """STATIC-CROSS-DUP: the fake cross path reads only N^b, so changing another
+    ownership source N^a (a != b) must leave target b's cross update bitwise
+    unchanged — extra capacity without extra ownership information."""
+    layer = StaticCrossLayer(factor_dim=8, dup=True)
+    _randomize_cross(layer, seed=3)
+    N = torch.randn(12, 3, 8, generator=torch.Generator().manual_seed(6))
+    base = layer.cross_update(N)
+    perturbed = N.clone()
+    perturbed[:, 0] = perturbed[:, 0] + 1.0  # perturb source ownership C
+
+    delta = layer.cross_update(perturbed)
+    assert torch.equal(delta[:, 1], base[:, 1]), "target Pt must ignore N^C"
+    assert torch.equal(delta[:, 2], base[:, 2]), "target Pv must ignore N^C"
+    assert not torch.equal(delta[:, 0], base[:, 0])  # reads N^C as its own state
+
+    # every pair message reads its target slot, never the other source slot
+    msgs = layer.cross_messages(perturbed)
+    msgs_base = layer.cross_messages(N)
+    for key in CROSS_PAIR_KEYS:
+        b = CROSS_PAIR_TARGET_SLOT[key]
+        if b == 0:
+            assert not torch.equal(msgs[key], msgs_base[key]), key
+        else:
+            assert torch.equal(msgs[key], msgs_base[key]), key
+
+
+def test_empty_graph_diag_and_cross_updates_exactly_zero():
+    """Empty graph -> N = 0 -> diag delta = D(0) = 0 and cross delta = C(0) = 0
+    exactly, for both O2-A variants."""
+    empty = torch.empty((2, 0), dtype=torch.long)
+    for dup in (False, True):
+        layer = StaticCrossLayer(factor_dim=8, dup=dup)
+        _randomize_cross(layer, seed=7)  # live cross weights, still C(0) = 0
+        H = torch.randn(10, 3, 8, generator=torch.Generator().manual_seed(8))
+        H_next, stats = layer.propagate(H, empty)
+        for a in range(3):
+            assert torch.equal(H_next[:, a], layer.norm[a](H[:, a]))
+        assert torch.equal(stats["diag_update_ratio"], torch.zeros(3))
+        assert torch.equal(stats["neighbor_norm"], torch.zeros(3))
+        assert torch.equal(stats["cross_update_ratio"], torch.zeros(3))
+        assert torch.equal(stats["cross_to_diag_ratio"], torch.zeros(3))
+        for key in CROSS_PAIR_KEYS:
+            assert float(stats[f"cross_pair_ratio_{key}"]) == 0.0
+
+
+def test_isolated_node_graph_updates_exactly_zero():
+    """A node with no in-edges receives no diag and no cross update: its H_next
+    is exactly LayerNorm(H), for both O2-A variants."""
+    edge_index = torch.tensor([[1, 2, 3], [2, 3, 1]], dtype=torch.long)  # node 0 isolated
+    for dup in (False, True):
+        layer = StaticCrossLayer(factor_dim=8, dup=dup)
+        _randomize_cross(layer, seed=9)
+        H = torch.randn(6, 3, 8, generator=torch.Generator().manual_seed(10))
+        H_next, _ = layer.propagate(H, edge_index)
+        for a in range(3):
+            assert torch.equal(
+                H_next[0, a], layer.norm[a](H[0, a] + torch.zeros_like(H[0, a]))
+            )
+
+
+def test_cross_gradients_nonzero_after_one_step():
+    """One optimizer step on a toy graph with enough edges: every one of the six
+    C_{a->b} must receive a non-zero gradient."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="static_cross")
+    edge_index = _random_graph(x.size(0), 40, seed=15)
+    model.train()
+    z, _, _, aux_loss, _ = model(x, edge_index)
+    (z.mean() + aux_loss).backward()
+    layer = model.diag_layers[0]
+    for key in CROSS_PAIR_KEYS:
+        grad = layer.cross[key].weight.grad
+        assert grad is not None, f"{key} got no gradient"
+        assert grad.abs().sum().item() > 0.0, f"{key} gradient is zero"
+
+
+def test_diag_variants_aux_keys_unchanged():
+    """Regression guard: diag_id / diag_nograph keep exactly their O1/O1.5
+    aux_info key set — no O2-A cross or post-transition keys leak in."""
+    edge_index = None
+    for variant in ("diag_id", "diag_nograph"):
+        torch.manual_seed(0)
+        model, x = _make_model(variant=variant)
+        edge_index = _random_graph(x.size(0), 24, seed=1)
+        model.train()
+        _, _, _, _, aux_info = model(x, edge_index)
+        assert len(aux_info) == 16, f"{variant} key count changed: {sorted(aux_info)}"
+        for key in aux_info:
+            assert not key.startswith("oft_l1_c_to_"), key
+            assert not key.startswith("oft_l1_pt_to_"), key
+            assert not key.startswith("oft_l1_pv_to_"), key
+            assert "post_cos" not in key and "state_drift" not in key, key
+
+
+def test_cross_variants_aux_keys_present():
+    """The O2-A diagnostics required by the plan are emitted in training mode."""
+    for variant in ("static_cross", "static_cross_dup"):
+        torch.manual_seed(0)
+        model, x = _make_model(variant=variant)
+        edge_index = _random_graph(x.size(0), 30, seed=17)
+        model.train()
+        _, _, _, aux_loss, aux_info = model(x, edge_index)
+        assert float(aux_loss) > 0.0
+        for slot in SLOT_NAMES:
+            assert f"oft_l1_{slot}_cross_update_ratio" in aux_info
+            assert f"oft_l1_{slot}_cross_to_diag_ratio" in aux_info
+            assert f"oft_l1_post_norm_{slot}" in aux_info
+            assert f"oft_l1_state_drift_{slot}" in aux_info
+            assert f"oft_l1_{slot}_diag_update_ratio" in aux_info
+        for key in CROSS_PAIR_KEYS:
+            assert f"oft_l1_{key}_cross_pair_ratio" in aux_info
+        for pair in ("c_pt", "c_pv", "pt_pv"):
+            assert f"oft_l1_post_cos_{pair}" in aux_info
+            assert f"oft_l1_pre_cos_{pair}" in aux_info
+
+
+def test_post_transition_stats_semantics():
+    """post_transition_stats: identical H0/H1 -> drift 0, post_cos == pre_cos."""
+    torch.manual_seed(0)
+    H = torch.randn(9, 3, 8, generator=torch.Generator().manual_seed(19))
+    stats = post_transition_stats(H, H)
+    for slot in SLOT_NAMES:
+        assert float(stats[f"state_drift_{slot}"]) == pytest.approx(0.0, abs=1e-6)
+    for pair in ("c_pt", "c_pv", "pt_pv"):
+        assert float(stats[f"post_cos_{pair}"]) == pytest.approx(
+            float(stats[f"pre_cos_{pair}"]), abs=1e-6
+        )
+
+
+def test_no_giant_edge_pair_tensor_static_cross():
+    """Profiler shape audit for the cross layer: still no [E, S, S, ...] op."""
+    torch.manual_seed(0)
+    layer = StaticCrossLayer(factor_dim=8)
+    _randomize_cross(layer, seed=21)
+    num_nodes, n_edges = 512, 4096
+    edge_index = _random_graph(num_nodes, n_edges, seed=23)
+    H = torch.randn(num_nodes, 3, 8, generator=torch.Generator().manual_seed(25))
+    try:
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU], record_shapes=True
+        ) as prof:
+            layer.propagate(H, edge_index)
+    except (torch.profiler.ProfilerError, RuntimeError):
+        pytest.skip("torch profiler with record_shapes unavailable")
+    S = 3
+    offenders = []
+    for evt in prof.events():
+        for shape in getattr(evt, "input_shapes", None) or []:
+            if len(shape) >= 3 and shape[0] == n_edges and shape[1] == S and shape[2] == S:
+                offenders.append((evt.key, shape))
+    assert not offenders, f"giant [E,S,S,...] tensor ops: {offenders[:5]}"
+
+
+def test_cross_variants_enforce_single_layer():
+    """O2-A is a single-layer scaffold like O1 / O1.5."""
+    x, data_info = _make_data()
+    for variant in ("static_cross", "static_cross_dup"):
+        with pytest.raises(ValueError, match="num_layers=1"):
+            Model(_make_cfg(variant=variant, num_layers=2), data_info)
+
+
+def test_encode_states_matches_forward_h1():
+    """The offline diagnostics hook must expose exactly the H1 the forward uses."""
+    torch.manual_seed(0)
+    model, x = _make_model(variant="static_cross")
+    _randomize_cross(model.diag_layers[0], seed=27)
+    edge_index = _random_graph(x.size(0), 26, seed=29)
+    model.eval()
+    with torch.no_grad():
+        H0, H1, stats = model.encode_states(x, edge_index, device=torch.device("cpu"))
+        layer = model.diag_layers[0]
+        H1_manual, stats_manual = layer.propagate(H0, edge_index)
+    assert torch.equal(H1, H1_manual)
+    for key in ("cross_update_ratio", "cross_to_diag_ratio"):
+        assert torch.equal(stats[key], stats_manual[key]), key
+    # post-transition hook is consistent with the returned states
+    post = post_transition_stats(H0, H1)
+    assert float(post["post_cos_c_pt"]) == pytest.approx(
+        float(post_transition_stats(H0, H1_manual)["post_cos_c_pt"]), abs=1e-6
+    )
